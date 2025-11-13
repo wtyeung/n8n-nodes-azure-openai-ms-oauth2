@@ -165,6 +165,7 @@ class LmChatAzureOpenAiMsOAuth2 {
         const endpoint = credentials.endpoint.replace(/\/$/, '');
         const model = new openai_1.AzureChatOpenAI({
             azureOpenAIApiDeploymentName: deploymentName,
+            azureOpenAIApiKey: 'dummy-key',
             azureOpenAIEndpoint: endpoint,
             azureOpenAIApiVersion: credentials.apiVersion,
             configuration: {

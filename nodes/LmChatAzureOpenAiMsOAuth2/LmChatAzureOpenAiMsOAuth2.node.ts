@@ -197,6 +197,7 @@ export class LmChatAzureOpenAiMsOAuth2 implements INodeType {
 
 		const model = new AzureChatOpenAI({
 			azureOpenAIApiDeploymentName: deploymentName,
+			azureOpenAIApiKey: 'dummy-key', // Required by SDK but not used - JWT is in Authorization header
 			azureOpenAIEndpoint: endpoint,
 			azureOpenAIApiVersion: credentials.apiVersion as string,
 			configuration: {
