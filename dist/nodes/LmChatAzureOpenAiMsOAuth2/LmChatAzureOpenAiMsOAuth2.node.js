@@ -163,12 +163,15 @@ class LmChatAzureOpenAiMsOAuth2 {
             throw new n8n_workflow_1.NodeOperationError(this.getNode(), 'OAuth2 access token not found. Please reconnect your credentials.');
         }
         const endpoint = credentials.endpoint.replace(/\/$/, '');
-        const azureOpenAIBasePath = `${endpoint}/openai`;
         const model = new openai_1.AzureChatOpenAI({
             azureOpenAIApiDeploymentName: deploymentName,
-            azureOpenAIApiKey: oauthData.access_token,
-            azureOpenAIBasePath: azureOpenAIBasePath,
+            azureOpenAIEndpoint: endpoint,
             azureOpenAIApiVersion: credentials.apiVersion,
+            configuration: {
+                defaultHeaders: {
+                    Authorization: `Bearer ${oauthData.access_token}`,
+                },
+            },
             maxTokens: options.maxTokens !== -1 ? options.maxTokens : undefined,
             temperature: options.temperature,
             topP: options.topP,

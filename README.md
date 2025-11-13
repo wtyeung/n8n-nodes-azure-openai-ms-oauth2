@@ -42,12 +42,15 @@ Or install directly in n8n:
 - **OAuth2 Security**: Enterprise-grade authentication with automatic token refresh
 
 ### Azure API Management (APIM) AI Gateway Support
+This node is specifically designed for APIM AI Gateway scenarios where:
+- **n8n sends JWT token** → APIM validates the OAuth2 JWT in `Authorization: Bearer` header
+- **APIM authenticates to Azure OpenAI** → APIM uses its own credentials (API key or managed identity)
 - **Centralized Management**: Route requests through APIM for unified API governance
 - **Advanced Monitoring**: Track usage, performance, and costs across all AI services
 - **Rate Limiting & Quotas**: Implement usage policies and prevent overages
-- **Security Policies**: Add authentication, IP filtering, and request validation
+- **Security Policies**: JWT validation, IP filtering, and request validation at APIM layer
 - **Load Balancing**: Distribute requests across multiple Azure OpenAI instances
-- **Custom Endpoints**: Use your organization's APIM gateway URL with custom OAuth2 scopes
+- **Custom OAuth2 Scopes**: Use your organization's custom API scopes (e.g., `api://your-app-id/.default`)
 
 ## Credentials
 
@@ -78,19 +81,30 @@ To use this node, you need:
 
 4. **Configure n8n Credentials**:
    - Credential Type: `Azure OpenAI MS OAuth2 API`
-   - **Scope**: Your Azure AD application scope in format `api://<your-app-id>/.default`
+   - **API Scope**: Your Azure AD application scope in format `api://<your-app-id>/.default`
      - Example: `api://12345678-1234-1234-1234-123456789abc/.default`
-     - This must match an API exposed in your Azure AD app registration
-   - **Endpoint**: Your API endpoint with trailing slash
-     - Example: `https://<apim-gateway-url>/aiProject/`
+     - This must match the API exposed in your Azure AD app registration
+     - The JWT token's `aud` (audience) claim will be set to this value
+   - **Endpoint**: Your APIM gateway base URL (without trailing slash)
+     - Example: `https://your-apim.azure-api.net/aiProject`
+     - This is your APIM API path, NOT the Azure OpenAI endpoint
+     - APIM will rewrite this to the actual Azure OpenAI backend endpoint
    - **API Version**: `2025-03-01-preview` (default, or use your preferred version)
    - **Client ID**: Your Azure AD application ID
    - **Client Secret**: Your Azure AD client secret
    - **Tenant ID**: Your Azure AD tenant ID
 
-   The node will construct the full URL as: `{endpoint}openai/deployments/{model}/chat/completions?api-version={apiVersion}`
-
-   **Important**: The JWT token's `aud` (audience) claim will be `api://<your-app-id>`. Ensure your APIM policies validate this audience claim.
+5. **APIM Configuration**:
+   - Configure APIM to validate the JWT token in the `Authorization: Bearer` header
+   - Set up APIM policies to validate the `aud` claim matches your API scope
+   - Configure APIM backend to point to your Azure OpenAI resource
+   - APIM will rewrite the URL from your APIM path to the Azure OpenAI endpoint
+   - Example flow:
+     - n8n calls: `https://your-apim.azure-api.net/aiProject/deployments/gpt-4/chat/completions`
+     - APIM rewrites to: `https://your-resource.openai.azure.com/openai/deployments/gpt-4/chat/completions`
+     - APIM authenticates to Azure OpenAI using API key or managed identity
+   - The node sends: `Authorization: Bearer <jwt-token>`
+   - APIM validates the JWT and forwards requests to Azure OpenAI with its own credentials
 
 ## Compatibility
 
@@ -108,7 +122,8 @@ To use this node, you need:
 2. In the AI Agent configuration, add a **Language Model**
 3. Select **Azure OpenAI Chat Model (MS OAuth2)**
 4. Configure your credentials
-5. Set the **Model** parameter to your deployment name (e.g., `gpt-4`)
+5. Set the **Deployment Name** parameter to your Azure OpenAI deployment name (e.g., `gpt-4-deployment`)
+   - This is the deployment name configured in your Azure OpenAI resource, NOT the model name
 6. Adjust options as needed:
    - **Frequency Penalty**: Reduces repetition (-2 to 2, default: 0)
    - **Maximum Number of Tokens**: Max tokens to generate (default: -1 for model default, max: 128000)

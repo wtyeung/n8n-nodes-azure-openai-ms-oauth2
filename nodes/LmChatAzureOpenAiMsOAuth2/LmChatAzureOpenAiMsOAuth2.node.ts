@@ -191,18 +191,19 @@ export class LmChatAzureOpenAiMsOAuth2 implements INodeType {
 			);
 		}
 
-		// Construct the base path for Azure OpenAI
-		// endpoint is like: https://<APIM URL>/aiProject/
-		// azureOpenAIBasePath should be: https://<APIM URL>/aiProject/openai
-		// The SDK will append: /deployments/{deploymentName}/chat/completions
+		// For APIM AI Gateway: Send JWT as Bearer token in Authorization header
+		// APIM validates the JWT and uses its own credentials to call Azure OpenAI backend
 		const endpoint = (credentials.endpoint as string).replace(/\/$/, ''); // Remove trailing slash
-		const azureOpenAIBasePath = `${endpoint}/openai`;
 
 		const model = new AzureChatOpenAI({
 			azureOpenAIApiDeploymentName: deploymentName,
-			azureOpenAIApiKey: oauthData.access_token as string,
-			azureOpenAIBasePath: azureOpenAIBasePath,
+			azureOpenAIEndpoint: endpoint,
 			azureOpenAIApiVersion: credentials.apiVersion as string,
+			configuration: {
+				defaultHeaders: {
+					Authorization: `Bearer ${oauthData.access_token}`,
+				},
+			},
 			maxTokens: options.maxTokens !== -1 ? options.maxTokens : undefined,
 			temperature: options.temperature,
 			topP: options.topP,
