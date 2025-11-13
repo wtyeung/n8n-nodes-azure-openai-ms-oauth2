@@ -12,11 +12,17 @@ class AzureOpenAiMsOAuth2Api {
             {
                 displayName: 'Scope',
                 name: 'scope',
+                type: 'hidden',
+                default: '={{$self.apiScope}}',
+            },
+            {
+                displayName: 'API Scope',
+                name: 'apiScope',
                 type: 'string',
                 required: true,
-                default: 'api://YOUR-APP-ID-HERE/.default',
+                default: 'api://REPLACE-WITH-YOUR-APP-ID/.default',
                 placeholder: 'api://12345678-1234-1234-1234-123456789abc/.default',
-                description: 'REQUIRED: Replace YOUR-APP-ID-HERE with your actual Azure AD application ID. Format: api://<your-app-id>/.default',
+                description: '⚠️ REQUIRED: Enter your Azure AD application scope. Format: api://<your-app-id>/.default',
             },
             {
                 displayName: 'Endpoint',
