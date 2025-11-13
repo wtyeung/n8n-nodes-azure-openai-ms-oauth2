@@ -14,9 +14,9 @@ class AzureOpenAiMsOAuth2Api {
                 name: 'scope',
                 type: 'string',
                 required: true,
-                default: 'openid',
-                placeholder: 'api://<APIM URL>/.default',
-                description: 'OAuth2 scope for your Azure AD application. Replace "openid" with your custom API scope (format: api://<your-app-id>/.default)',
+                default: 'api://YOUR-APP-ID-HERE/.default',
+                placeholder: 'api://12345678-1234-1234-1234-123456789abc/.default',
+                description: 'REQUIRED: Replace YOUR-APP-ID-HERE with your actual Azure AD application ID. Format: api://<your-app-id>/.default',
             },
             {
                 displayName: 'Endpoint',
