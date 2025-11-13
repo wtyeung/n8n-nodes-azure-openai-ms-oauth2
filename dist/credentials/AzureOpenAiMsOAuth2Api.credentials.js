@@ -10,6 +10,15 @@ class AzureOpenAiMsOAuth2Api {
         this.icon = 'file:azure-openai.svg';
         this.properties = [
             {
+                displayName: 'Scope',
+                name: 'scope',
+                type: 'string',
+                required: true,
+                default: '',
+                placeholder: 'api://<APIM URL>/.default',
+                description: 'OAuth2 scope for your Azure AD application. Must match the API exposed in your app registration (format: api://<your-app-id>/.default)',
+            },
+            {
                 displayName: 'Endpoint',
                 name: 'endpoint',
                 type: 'string',
@@ -25,15 +34,6 @@ class AzureOpenAiMsOAuth2Api {
                 required: true,
                 default: '2025-03-01-preview',
                 description: 'The API version to use for Azure OpenAI',
-            },
-            {
-                displayName: 'Scope',
-                name: 'scope',
-                type: 'string',
-                required: true,
-                default: 'https://cognitiveservices.azure.com/.default',
-                placeholder: 'api://<your-app-id>/.default',
-                description: 'OAuth2 scope for your API (e.g., api://<your-app-id>/.default or https://cognitiveservices.azure.com/.default)',
             },
         ];
         this.authenticate = {

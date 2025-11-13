@@ -66,9 +66,11 @@ To use this node, you need:
    - Create a new registration
    - Note the Application (client) ID and Directory (tenant) ID
 
-2. **Configure API Permissions**:
-   - Add `Cognitive Services` API permissions
-   - Grant `https://cognitiveservices.azure.com/.default` scope
+2. **Expose an API**:
+   - In your app registration, go to "Expose an API"
+   - Add an Application ID URI (e.g., `api://12345678-1234-1234-1234-123456789abc`)
+   - Add a scope (e.g., `user_impersonation`) or use the default `.default` scope
+   - This creates the scope: `api://<your-app-id>/.default`
 
 3. **Create Client Secret**:
    - In your app registration, go to Certificates & secrets
@@ -76,20 +78,19 @@ To use this node, you need:
 
 4. **Configure n8n Credentials**:
    - Credential Type: `Azure OpenAI MS OAuth2 API`
+   - **Scope**: Your Azure AD application scope in format `api://<your-app-id>/.default`
+     - Example: `api://12345678-1234-1234-1234-123456789abc/.default`
+     - This must match an API exposed in your Azure AD app registration
    - **Endpoint**: Your API endpoint with trailing slash
-     - Direct Azure OpenAI: `https://<resource-name>.openai.azure.com/`
-     - APIM AI Gateway: `https://<apim-gateway-url>/aiProject/`
+     - Example: `https://<apim-gateway-url>/aiProject/`
    - **API Version**: `2025-03-01-preview` (default, or use your preferred version)
-   - **Scope**: Your OAuth2 scope
-     - Direct Azure OpenAI: `https://cognitiveservices.azure.com/.default`
-     - Custom APIM scope: `api://<your-app-id>/.default` (where `<your-app-id>` is your Azure AD application ID)
    - **Client ID**: Your Azure AD application ID
    - **Client Secret**: Your Azure AD client secret
    - **Tenant ID**: Your Azure AD tenant ID
 
    The node will construct the full URL as: `{endpoint}openai/deployments/{model}/chat/completions?api-version={apiVersion}`
 
-   **Note**: When using APIM as an AI Gateway, the JWT token's `aud` (audience) claim will match your configured scope. Ensure your APIM policies validate this audience claim.
+   **Important**: The JWT token's `aud` (audience) claim will be `api://<your-app-id>`. Ensure your APIM policies validate this audience claim.
 
 ## Compatibility
 
