@@ -6,7 +6,8 @@ class AzureOpenAiMsOAuth2Api {
         this.name = 'azureOpenAiMsOAuth2Api';
         this.extends = ['microsoftOAuth2Api'];
         this.displayName = 'Azure OpenAI MS OAuth2 API';
-        this.documentationUrl = 'azureopenai';
+        this.documentationUrl = 'https://github.com/wtyeung/n8n-nodes-azure-openai-ms-oauth2';
+        this.icon = 'file:azure-openai.svg';
         this.properties = [
             {
                 displayName: 'Endpoint',

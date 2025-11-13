@@ -18,6 +18,7 @@ export class LmChatAzureOpenAiMsOAuth2 implements INodeType {
 		defaults: {
 			name: 'Azure OpenAI Chat Model (MS OAuth2)',
 		},
+		usableAsTool: true,
 		codex: {
 			categories: ['AI'],
 			subcategories: {
@@ -85,6 +86,13 @@ export class LmChatAzureOpenAiMsOAuth2 implements INodeType {
 						type: 'number',
 					},
 					{
+						displayName: 'Max Retries',
+						name: 'maxRetries',
+						default: 2,
+						description: 'Maximum number of retries to attempt on failure',
+						type: 'number',
+					},
+					{
 						displayName: 'Maximum Number of Tokens',
 						name: 'maxTokens',
 						default: -1,
@@ -94,13 +102,6 @@ export class LmChatAzureOpenAiMsOAuth2 implements INodeType {
 						typeOptions: {
 							maxValue: 128000,
 						},
-					},
-					{
-						displayName: 'Max Retries',
-						name: 'maxRetries',
-						default: 2,
-						description: 'Maximum number of retries to attempt on failure',
-						type: 'number',
 					},
 					{
 						displayName: 'Presence Penalty',
@@ -182,7 +183,7 @@ export class LmChatAzureOpenAiMsOAuth2 implements INodeType {
 			);
 		}
 
-		const oauthData = credentials.oauthTokenData as any;
+		const oauthData = credentials.oauthTokenData as unknown as { access_token?: string };
 		if (!oauthData?.access_token) {
 			throw new NodeOperationError(
 				this.getNode(),

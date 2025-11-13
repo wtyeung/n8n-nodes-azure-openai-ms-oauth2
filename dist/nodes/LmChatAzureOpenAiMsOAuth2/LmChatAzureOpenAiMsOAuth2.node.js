@@ -15,6 +15,7 @@ class LmChatAzureOpenAiMsOAuth2 {
             defaults: {
                 name: 'Azure OpenAI Chat Model (MS OAuth2)',
             },
+            usableAsTool: true,
             codex: {
                 categories: ['AI'],
                 subcategories: {
@@ -79,6 +80,13 @@ class LmChatAzureOpenAiMsOAuth2 {
                             type: 'number',
                         },
                         {
+                            displayName: 'Max Retries',
+                            name: 'maxRetries',
+                            default: 2,
+                            description: 'Maximum number of retries to attempt on failure',
+                            type: 'number',
+                        },
+                        {
                             displayName: 'Maximum Number of Tokens',
                             name: 'maxTokens',
                             default: -1,
@@ -87,13 +95,6 @@ class LmChatAzureOpenAiMsOAuth2 {
                             typeOptions: {
                                 maxValue: 128000,
                             },
-                        },
-                        {
-                            displayName: 'Max Retries',
-                            name: 'maxRetries',
-                            default: 2,
-                            description: 'Maximum number of retries to attempt on failure',
-                            type: 'number',
                         },
                         {
                             displayName: 'Presence Penalty',

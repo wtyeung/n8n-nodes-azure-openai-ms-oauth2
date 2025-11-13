@@ -4,6 +4,7 @@ export declare class AzureOpenAiMsOAuth2Api implements ICredentialType {
     extends: string[];
     displayName: string;
     documentationUrl: string;
+    icon: "file:azure-openai.svg";
     properties: INodeProperties[];
     authenticate: IAuthenticateGeneric;
     test: ICredentialTestRequest;

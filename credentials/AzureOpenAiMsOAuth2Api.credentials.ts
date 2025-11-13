@@ -12,7 +12,9 @@ export class AzureOpenAiMsOAuth2Api implements ICredentialType {
 
 	displayName = 'Azure OpenAI MS OAuth2 API';
 
-	documentationUrl = 'azureopenai';
+	documentationUrl = 'https://github.com/wtyeung/n8n-nodes-azure-openai-ms-oauth2';
+
+	icon = 'file:azure-openai.svg' as const;
 
 	properties: INodeProperties[] = [
 		{

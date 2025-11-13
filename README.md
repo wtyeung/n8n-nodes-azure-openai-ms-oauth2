@@ -17,7 +17,20 @@ Azure OpenAI Service provides REST API access to OpenAI's powerful language mode
 
 ## Installation
 
+**⚠️ Self-Hosted n8n Required**: This node requires a self-hosted n8n instance as it depends on `@langchain/openai` and `langchain` packages. n8n Cloud does not support community nodes with external dependencies.
+
 Follow the [installation guide](https://docs.n8n.io/integrations/community-nodes/installation/) in the n8n community nodes documentation.
+
+For self-hosted n8n:
+```bash
+npm install n8n-nodes-azure-openai-ms-oauth2
+```
+
+Or install directly in n8n:
+1. Go to **Settings** > **Community Nodes**
+2. Select **Install**
+3. Enter `n8n-nodes-azure-openai-ms-oauth2`
+4. Agree to the risks and install
 
 ## Features
 
@@ -80,9 +93,11 @@ To use this node, you need:
 
 ## Compatibility
 
+- **Self-hosted n8n only** (not compatible with n8n Cloud)
 - Minimum n8n version: 1.0.0
 - Tested with n8n version: 1.119.1+
 - Requires LangChain support in n8n
+- Requires `@langchain/openai` and `langchain` packages (installed as peer dependencies)
 
 ## Usage
 
