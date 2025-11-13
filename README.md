@@ -82,7 +82,7 @@ To use this node, you need:
    - **API Version**: `2025-03-01-preview` (default, or use your preferred version)
    - **Scope**: Your OAuth2 scope
      - Direct Azure OpenAI: `https://cognitiveservices.azure.com/.default`
-     - APIM with custom scope: `api://<your-app-id>/.default`
+     - Custom APIM scope: `api://<your-app-id>/.default` (where `<your-app-id>` is your Azure AD application ID)
    - **Client ID**: Your Azure AD application ID
    - **Client Secret**: Your Azure AD client secret
    - **Tenant ID**: Your Azure AD tenant ID

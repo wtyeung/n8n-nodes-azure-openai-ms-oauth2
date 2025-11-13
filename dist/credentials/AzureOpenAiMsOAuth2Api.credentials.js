@@ -32,8 +32,8 @@ class AzureOpenAiMsOAuth2Api {
                 type: 'string',
                 required: true,
                 default: 'https://cognitiveservices.azure.com/.default',
-                placeholder: 'api://<APIM URL>/.default',
-                description: 'OAuth2 scope for your API (e.g., api://<APIM URL>/.default or https://cognitiveservices.azure.com/.default)',
+                placeholder: 'api://<your-app-id>/.default',
+                description: 'OAuth2 scope for your API (e.g., api://<your-app-id>/.default or https://cognitiveservices.azure.com/.default)',
             },
         ];
         this.authenticate = {
