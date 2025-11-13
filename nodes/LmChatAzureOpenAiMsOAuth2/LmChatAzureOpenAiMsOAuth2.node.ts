@@ -59,12 +59,12 @@ export class LmChatAzureOpenAiMsOAuth2 implements INodeType {
 				},
 			},
 			{
-				displayName: 'Model',
-				name: 'model',
+				displayName: 'Deployment Name',
+				name: 'deploymentName',
 				type: 'string',
 				description:
-					'The model deployment name to use. <a href="https://learn.microsoft.com/en-us/azure/ai-services/openai/concepts/models">Learn more</a>.',
-				placeholder: 'e.g. gpt-4',
+					'The deployment name (not model name) configured in your Azure OpenAI resource. <a href="https://learn.microsoft.com/en-us/azure/ai-services/openai/how-to/create-resource">Learn more</a>.',
+				placeholder: 'e.g. gpt-4-deployment',
 				default: '',
 				required: true,
 			},
@@ -164,7 +164,7 @@ export class LmChatAzureOpenAiMsOAuth2 implements INodeType {
 	async supplyData(this: ISupplyDataFunctions, itemIndex: number): Promise<SupplyData> {
 		const credentials = await this.getCredentials('azureOpenAiMsOAuth2Api');
 
-		const modelName = this.getNodeParameter('model', itemIndex) as string;
+		const deploymentName = this.getNodeParameter('deploymentName', itemIndex) as string;
 		const options = this.getNodeParameter('options', itemIndex, {}) as {
 			maxTokens?: number;
 			temperature?: number;
@@ -193,13 +193,12 @@ export class LmChatAzureOpenAiMsOAuth2 implements INodeType {
 
 		// Construct the base path for Azure OpenAI
 		// endpoint is like: https://<APIM URL>/aiProject/
-		// We need to append: openai/deployments/{model}/chat/completions
+		// We need to append: openai/deployments/{deploymentName}/chat/completions
 		const endpoint = (credentials.endpoint as string).replace(/\/$/, ''); // Remove trailing slash
-		const azureEndpoint = `${endpoint}/openai/deployments/${modelName}`;
+		const azureEndpoint = `${endpoint}/openai/deployments/${deploymentName}`;
 
 		const model = new AzureChatOpenAI({
-			model: modelName, // Model name for correct logging
-			azureOpenAIApiDeploymentName: modelName,
+			azureOpenAIApiDeploymentName: deploymentName,
 			azureOpenAIApiKey: oauthData.access_token as string,
 			azureOpenAIBasePath: azureEndpoint,
 			azureOpenAIApiVersion: credentials.apiVersion as string,

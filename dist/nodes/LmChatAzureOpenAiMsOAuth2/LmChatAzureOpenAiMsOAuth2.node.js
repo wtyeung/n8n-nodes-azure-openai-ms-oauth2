@@ -55,11 +55,11 @@ class LmChatAzureOpenAiMsOAuth2 {
                     },
                 },
                 {
-                    displayName: 'Model',
-                    name: 'model',
+                    displayName: 'Deployment Name',
+                    name: 'deploymentName',
                     type: 'string',
-                    description: 'The model deployment name to use. <a href="https://learn.microsoft.com/en-us/azure/ai-services/openai/concepts/models">Learn more</a>.',
-                    placeholder: 'e.g. gpt-4',
+                    description: 'The deployment name (not model name) configured in your Azure OpenAI resource. <a href="https://learn.microsoft.com/en-us/azure/ai-services/openai/how-to/create-resource">Learn more</a>.',
+                    placeholder: 'e.g. gpt-4-deployment',
                     default: '',
                     required: true,
                 },
@@ -153,7 +153,7 @@ class LmChatAzureOpenAiMsOAuth2 {
     async supplyData(itemIndex) {
         var _a, _b;
         const credentials = await this.getCredentials('azureOpenAiMsOAuth2Api');
-        const modelName = this.getNodeParameter('model', itemIndex);
+        const deploymentName = this.getNodeParameter('deploymentName', itemIndex);
         const options = this.getNodeParameter('options', itemIndex, {});
         if (!credentials.endpoint) {
             throw new n8n_workflow_1.NodeOperationError(this.getNode(), 'Endpoint is required in credentials');
@@ -163,10 +163,9 @@ class LmChatAzureOpenAiMsOAuth2 {
             throw new n8n_workflow_1.NodeOperationError(this.getNode(), 'OAuth2 access token not found. Please reconnect your credentials.');
         }
         const endpoint = credentials.endpoint.replace(/\/$/, '');
-        const azureEndpoint = `${endpoint}/openai/deployments/${modelName}`;
+        const azureEndpoint = `${endpoint}/openai/deployments/${deploymentName}`;
         const model = new openai_1.AzureChatOpenAI({
-            model: modelName,
-            azureOpenAIApiDeploymentName: modelName,
+            azureOpenAIApiDeploymentName: deploymentName,
             azureOpenAIApiKey: oauthData.access_token,
             azureOpenAIBasePath: azureEndpoint,
             azureOpenAIApiVersion: credentials.apiVersion,
