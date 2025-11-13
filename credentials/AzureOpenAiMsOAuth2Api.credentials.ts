@@ -22,9 +22,9 @@ export class AzureOpenAiMsOAuth2Api implements ICredentialType {
 			name: 'scope',
 			type: 'string',
 			required: true,
-			default: '',
+			default: 'openid',
 			placeholder: 'api://<APIM URL>/.default',
-			description: 'OAuth2 scope for your Azure AD application. Must match the API exposed in your app registration (format: api://<your-app-id>/.default)',
+			description: 'OAuth2 scope for your Azure AD application. Replace "openid" with your custom API scope (format: api://<your-app-id>/.default)',
 		},
 		{
 			displayName: 'Endpoint',
