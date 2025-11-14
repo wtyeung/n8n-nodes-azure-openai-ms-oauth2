@@ -10,14 +10,18 @@ async function getCurrentToken(context) {
     context.logger.info('Getting current token', {
         hasToken: !!(oauthData === null || oauthData === void 0 ? void 0 : oauthData.access_token),
         hasExpiresAt: !!(oauthData === null || oauthData === void 0 ? void 0 : oauthData.expires_at),
-        expiresAt: (oauthData === null || oauthData === void 0 ? void 0 : oauthData.expires_at) ? new Date(oauthData.expires_at * 1000).toISOString() : 'not set'
+        hasExp: !!(oauthData === null || oauthData === void 0 ? void 0 : oauthData.exp),
+        expiresAt: (oauthData === null || oauthData === void 0 ? void 0 : oauthData.expires_at) ? new Date(oauthData.expires_at * 1000).toISOString() : 'not set',
+        exp: (oauthData === null || oauthData === void 0 ? void 0 : oauthData.exp) ? new Date(oauthData.exp * 1000).toISOString() : 'not set',
+        allFields: Object.keys(oauthData || {})
     });
     if (!(oauthData === null || oauthData === void 0 ? void 0 : oauthData.access_token)) {
         throw new n8n_workflow_1.NodeOperationError(context.getNode(), 'OAuth2 access token not found. Please reconnect your credentials.');
     }
-    if (oauthData.expires_at) {
+    const expiryTime = oauthData.expires_at || oauthData.exp;
+    if (expiryTime) {
         const now = Math.floor(Date.now() / 1000);
-        const expiresAt = oauthData.expires_at;
+        const expiresAt = expiryTime;
         const bufferTime = 300;
         if (now >= expiresAt - bufferTime) {
             context.logger.info(`Token expired or expiring soon (expires at ${new Date(expiresAt * 1000).toISOString()}), triggering refresh via test request...`);
@@ -62,7 +66,7 @@ async function getCurrentToken(context) {
         }
     }
     else {
-        context.logger.warn('Token does not have expires_at - cannot proactively refresh. Will rely on 401 retry logic.');
+        context.logger.warn('Token does not have expires_at or exp field - cannot proactively refresh. Will rely on 401 retry logic.');
     }
     return oauthData.access_token;
 }
@@ -215,7 +219,7 @@ class LmChatAzureOpenAiMsOAuth2 {
     }
     async supplyData(itemIndex) {
         var _a, _b;
-        this.logger.info('=== supplyData called for Azure OpenAI Chat Model (MS OAuth2) v1.1.4 ===');
+        this.logger.info('=== supplyData called for Azure OpenAI Chat Model (MS OAuth2) v1.1.5 ===');
         const deploymentName = this.getNodeParameter('deploymentName', itemIndex);
         const options = this.getNodeParameter('options', itemIndex, {});
         const context = this;

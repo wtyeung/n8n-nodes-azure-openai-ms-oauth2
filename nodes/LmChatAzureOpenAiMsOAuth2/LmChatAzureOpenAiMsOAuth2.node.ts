@@ -11,6 +11,7 @@ interface OAuthTokenData {
 	access_token?: string;
 	expires_in?: number;
 	expires_at?: number;
+	exp?: number; // JWT standard expiry claim
 	refresh_token?: string;
 }
 
@@ -24,10 +25,14 @@ async function getCurrentToken(
 	const credentials = await context.getCredentials('azureOpenAiMsOAuth2Api');
 	const oauthData = credentials.oauthTokenData as OAuthTokenData;
 	
+	// Log all available fields in token data for debugging
 	context.logger.info('Getting current token', { 
 		hasToken: !!oauthData?.access_token,
 		hasExpiresAt: !!oauthData?.expires_at,
-		expiresAt: oauthData?.expires_at ? new Date(oauthData.expires_at * 1000).toISOString() : 'not set'
+		hasExp: !!oauthData?.exp,
+		expiresAt: oauthData?.expires_at ? new Date(oauthData.expires_at * 1000).toISOString() : 'not set',
+		exp: oauthData?.exp ? new Date(oauthData.exp * 1000).toISOString() : 'not set',
+		allFields: Object.keys(oauthData || {})
 	});
 	
 	if (!oauthData?.access_token) {
@@ -38,9 +43,12 @@ async function getCurrentToken(
 	}
 
 	// Check if token is expired or about to expire (within 5 minutes)
-	if (oauthData.expires_at) {
+	// Support both expires_at (n8n format) and exp (JWT standard)
+	const expiryTime = oauthData.expires_at || oauthData.exp;
+	
+	if (expiryTime) {
 		const now = Math.floor(Date.now() / 1000);
-		const expiresAt = oauthData.expires_at;
+		const expiresAt = expiryTime;
 		const bufferTime = 300; // 5 minutes
 
 		if (now >= expiresAt - bufferTime) {
@@ -95,7 +103,7 @@ async function getCurrentToken(
 			context.logger.info(`Token still valid, expires in ${Math.floor((expiresAt - now) / 60)} minutes`);
 		}
 	} else {
-		context.logger.warn('Token does not have expires_at - cannot proactively refresh. Will rely on 401 retry logic.');
+		context.logger.warn('Token does not have expires_at or exp field - cannot proactively refresh. Will rely on 401 retry logic.');
 	}
 
 	return oauthData.access_token;
@@ -256,7 +264,7 @@ export class LmChatAzureOpenAiMsOAuth2 implements INodeType {
 	};
 
 	async supplyData(this: ISupplyDataFunctions, itemIndex: number): Promise<SupplyData> {
-		this.logger.info('=== supplyData called for Azure OpenAI Chat Model (MS OAuth2) v1.1.4 ===');
+		this.logger.info('=== supplyData called for Azure OpenAI Chat Model (MS OAuth2) v1.1.5 ===');
 		
 		const deploymentName = this.getNodeParameter('deploymentName', itemIndex) as string;
 		const options = this.getNodeParameter('options', itemIndex, {}) as {
