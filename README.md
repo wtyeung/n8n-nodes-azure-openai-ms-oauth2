@@ -40,9 +40,10 @@ Or install directly in n8n:
 - **Streaming Support**: Real-time response streaming
 - **Model Parameters**: Full control over temperature, max tokens, penalties, etc.
 - **OAuth2 Security**: Enterprise-grade authentication with proactive token refresh
-  - Automatically checks token expiry before each request
-  - Refreshes tokens 5 minutes before expiration
+  - Automatically decodes JWT to check token expiry before each request
+  - Refreshes tokens 15 minutes before expiration (configurable)
   - Prevents authentication failures from expired tokens
+  - Configurable refresh buffer via environment variable
 
 ### Azure API Management (APIM) AI Gateway Support
 This node is specifically designed for APIM AI Gateway scenarios where:
@@ -159,27 +160,59 @@ To use this node, you need:
 
 The AI Agent can use your Azure OpenAI deployment with OAuth2 authentication for secure, enterprise-grade AI workflows.
 
+## Configuration
+
+### Environment Variables
+
+#### `AZURE_OPENAI_TOKEN_REFRESH_BUFFER_SECONDS`
+
+Configure how early the token should be refreshed before expiration.
+
+- **Default**: `900` (15 minutes)
+- **Valid Range**: `60` to `3600` (1 minute to 60 minutes)
+- **Purpose**: Ensures the token remains valid throughout workflow execution
+
+**Example:**
+```bash
+# Refresh token 30 minutes before expiration (for very long workflows)
+export AZURE_OPENAI_TOKEN_REFRESH_BUFFER_SECONDS=1800
+
+# Refresh token 5 minutes before expiration (for quick workflows)
+export AZURE_OPENAI_TOKEN_REFRESH_BUFFER_SECONDS=300
+```
+
+**When to adjust:**
+- **Longer buffer (20-30 min)**: For workflows that take a long time to execute
+- **Shorter buffer (5-10 min)**: For quick workflows to minimize unnecessary refreshes
+- **Default (15 min)**: Suitable for most use cases
+
 ## Troubleshooting
 
 ### Token Refresh Issues
 
-This node implements **dynamic token refresh** to prevent authentication failures:
+This node implements **automatic token refresh** to prevent authentication failures:
 
-- **Invocation-Time Refresh**: The node fetches a fresh OAuth2 token before each `invoke()` or `stream()` call
-- **Automatic Expiry Check**: Checks if the token is expired or about to expire (within 5 minutes) before each API call
-- **Automatic Refresh**: If the token is expiring soon, it automatically requests a new token from Azure AD
-- **Model Instance Reuse**: Even when the LangChain model instance is reused across workflow executions, the token is always fresh
-- **Workaround for LangChain Limitation**: LangChain's `AzureChatOpenAI` doesn't support dynamic credentials, so this node wraps the model methods to inject fresh tokens on each call
+- **JWT Decoding**: Extracts the `exp` claim from the access token to determine exact expiry time
+- **Proactive Refresh**: Automatically refreshes the token before it expires (configurable buffer time)
+- **Manual Refresh**: Uses Azure AD token endpoint with `refresh_token` grant to get a new access token
+- **Per-Execution**: Token is checked and refreshed (if needed) at the start of each workflow execution
+
+**How it works:**
+
+1. When a workflow starts, the node decodes the JWT access token to get the expiry time
+2. If the token expires within the buffer period (default 15 minutes), it triggers a refresh
+3. The node calls Azure AD's token endpoint with the refresh token to get a new access token
+4. The fresh token is used for the entire workflow execution
 
 **If you still experience token expiration issues:**
 
 1. **Verify `offline_access` scope**: The credential automatically adds `offline_access` to your API scope to enable refresh tokens. Check your Azure AD app registration allows this scope.
 
-2. **Check token expiry data**: The node relies on `expires_at` timestamp in the OAuth token data. If your Azure AD doesn't provide this, the proactive refresh won't work.
+2. **Check refresh token**: Ensure your Azure AD app is configured to issue refresh tokens. The node logs will show if a refresh token is missing.
 
-3. **Manual reconnection**: If automatic refresh fails, you may need to manually reconnect your credentials in n8n to re-authenticate.
+3. **Adjust buffer time**: If your workflows take longer than 15 minutes, increase `AZURE_OPENAI_TOKEN_REFRESH_BUFFER_SECONDS`.
 
-4. **Check logs**: Enable n8n logging to see token refresh attempts and any errors.
+4. **Check logs**: Enable n8n logging to see token refresh attempts and any errors. Look for messages like "Token refreshed successfully via manual refresh".
 
 ## Resources
 

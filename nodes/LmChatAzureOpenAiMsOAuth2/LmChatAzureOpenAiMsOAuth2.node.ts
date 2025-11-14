@@ -111,8 +111,7 @@ async function getCurrentToken(
 				const tokenChanged = refreshedOauthData.access_token !== oauthData.access_token;
 				context.logger.info('TEST MODE: Token refresh test completed', { 
 					tokenChanged,
-					oldTokenPrefix: oauthData.access_token.substring(0, 20),
-					newTokenPrefix: refreshedOauthData.access_token.substring(0, 20)
+					hasNewToken: !!refreshedOauthData.access_token
 				});
 				return refreshedOauthData.access_token;
 			}
@@ -135,7 +134,21 @@ async function getCurrentToken(
 	if (expiryTime) {
 		const now = Math.floor(Date.now() / 1000);
 		const expiresAt = expiryTime;
-		const bufferTime = 900; // 15 minutes - ensures token remains valid during long workflow executions
+		
+		// Get buffer time from environment variable or use default (15 minutes)
+		// Valid range: 60 seconds (1 minute) to 3600 seconds (60 minutes)
+		const envBufferTime = process.env.AZURE_OPENAI_TOKEN_REFRESH_BUFFER_SECONDS;
+		let bufferTime = 900; // Default: 15 minutes
+		
+		if (envBufferTime) {
+			const parsedBuffer = parseInt(envBufferTime, 10);
+			if (!isNaN(parsedBuffer) && parsedBuffer >= 60 && parsedBuffer <= 3600) {
+				bufferTime = parsedBuffer;
+				context.logger.info(`Using custom token refresh buffer: ${bufferTime} seconds (${Math.floor(bufferTime / 60)} minutes)`);
+			} else {
+				context.logger.warn(`Invalid AZURE_OPENAI_TOKEN_REFRESH_BUFFER_SECONDS value: ${envBufferTime}. Must be between 60 and 3600. Using default: ${bufferTime} seconds.`);
+			}
+		}
 
 		if (now >= expiresAt - bufferTime) {
 			context.logger.info(`Token expired or expiring soon (expires at ${new Date(expiresAt * 1000).toISOString()}), triggering refresh...`);
@@ -368,7 +381,7 @@ export class LmChatAzureOpenAiMsOAuth2 implements INodeType {
 	};
 
 	async supplyData(this: ISupplyDataFunctions, itemIndex: number): Promise<SupplyData> {
-		this.logger.info('=== supplyData called for Azure OpenAI Chat Model (MS OAuth2) v1.2.5 ===');
+		this.logger.info('=== supplyData called for Azure OpenAI Chat Model (MS OAuth2) v1.3.0 ===');
 		
 		const deploymentName = this.getNodeParameter('deploymentName', itemIndex) as string;
 		const options = this.getNodeParameter('options', itemIndex, {}) as {

@@ -55,8 +55,7 @@ async function getCurrentToken(context, deploymentName) {
                 const tokenChanged = refreshedOauthData.access_token !== oauthData.access_token;
                 context.logger.info('TEST MODE: Token refresh test completed', {
                     tokenChanged,
-                    oldTokenPrefix: oauthData.access_token.substring(0, 20),
-                    newTokenPrefix: refreshedOauthData.access_token.substring(0, 20)
+                    hasNewToken: !!refreshedOauthData.access_token
                 });
                 return refreshedOauthData.access_token;
             }
@@ -75,7 +74,18 @@ async function getCurrentToken(context, deploymentName) {
     if (expiryTime) {
         const now = Math.floor(Date.now() / 1000);
         const expiresAt = expiryTime;
-        const bufferTime = 900;
+        const envBufferTime = process.env.AZURE_OPENAI_TOKEN_REFRESH_BUFFER_SECONDS;
+        let bufferTime = 900;
+        if (envBufferTime) {
+            const parsedBuffer = parseInt(envBufferTime, 10);
+            if (!isNaN(parsedBuffer) && parsedBuffer >= 60 && parsedBuffer <= 3600) {
+                bufferTime = parsedBuffer;
+                context.logger.info(`Using custom token refresh buffer: ${bufferTime} seconds (${Math.floor(bufferTime / 60)} minutes)`);
+            }
+            else {
+                context.logger.warn(`Invalid AZURE_OPENAI_TOKEN_REFRESH_BUFFER_SECONDS value: ${envBufferTime}. Must be between 60 and 3600. Using default: ${bufferTime} seconds.`);
+            }
+        }
         if (now >= expiresAt - bufferTime) {
             context.logger.info(`Token expired or expiring soon (expires at ${new Date(expiresAt * 1000).toISOString()}), triggering refresh...`);
             if (!oauthData.refresh_token) {
@@ -284,7 +294,7 @@ class LmChatAzureOpenAiMsOAuth2 {
     }
     async supplyData(itemIndex) {
         var _a, _b;
-        this.logger.info('=== supplyData called for Azure OpenAI Chat Model (MS OAuth2) v1.2.5 ===');
+        this.logger.info('=== supplyData called for Azure OpenAI Chat Model (MS OAuth2) v1.3.0 ===');
         const deploymentName = this.getNodeParameter('deploymentName', itemIndex);
         const options = this.getNodeParameter('options', itemIndex, {});
         const context = this;
