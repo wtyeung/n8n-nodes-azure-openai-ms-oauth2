@@ -215,6 +215,7 @@ class LmChatAzureOpenAiMsOAuth2 {
     }
     async supplyData(itemIndex) {
         var _a, _b;
+        this.logger.info('=== supplyData called for Azure OpenAI Chat Model (MS OAuth2) v1.1.3 ===');
         const deploymentName = this.getNodeParameter('deploymentName', itemIndex);
         const options = this.getNodeParameter('options', itemIndex, {});
         const context = this;
@@ -253,8 +254,10 @@ class LmChatAzureOpenAiMsOAuth2 {
         const originalStream = model.stream.bind(model);
         model.invoke = async function (input, options) {
             var _a;
+            context.logger.info('=== Model invoke() called - fetching fresh credentials ===');
             const freshCreds = await getCredentialsWithFreshToken();
             this.azureOpenAIApiKey = freshCreds.accessToken;
+            context.logger.info('Token injected into model, calling original invoke');
             try {
                 return await originalInvoke(input, options);
             }

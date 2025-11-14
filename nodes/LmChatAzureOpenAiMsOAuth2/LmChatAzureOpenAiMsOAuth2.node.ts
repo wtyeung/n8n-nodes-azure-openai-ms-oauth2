@@ -256,6 +256,8 @@ export class LmChatAzureOpenAiMsOAuth2 implements INodeType {
 	};
 
 	async supplyData(this: ISupplyDataFunctions, itemIndex: number): Promise<SupplyData> {
+		this.logger.info('=== supplyData called for Azure OpenAI Chat Model (MS OAuth2) v1.1.3 ===');
+		
 		const deploymentName = this.getNodeParameter('deploymentName', itemIndex) as string;
 		const options = this.getNodeParameter('options', itemIndex, {}) as {
 			maxTokens?: number;
@@ -322,9 +324,11 @@ export class LmChatAzureOpenAiMsOAuth2 implements INodeType {
 		const originalStream = model.stream.bind(model);
 		
 		model.invoke = async function(input: any, options?: any) {
+			context.logger.info('=== Model invoke() called - fetching fresh credentials ===');
 			// Get fresh token before invoke
 			const freshCreds = await getCredentialsWithFreshToken();
 			(this as any).azureOpenAIApiKey = freshCreds.accessToken;
+			context.logger.info('Token injected into model, calling original invoke');
 			
 			try {
 				return await originalInvoke(input, options);
