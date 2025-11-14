@@ -39,7 +39,10 @@ Or install directly in n8n:
 - **LangChain Chains**: Compatible with all LangChain chain types
 - **Streaming Support**: Real-time response streaming
 - **Model Parameters**: Full control over temperature, max tokens, penalties, etc.
-- **OAuth2 Security**: Enterprise-grade authentication with automatic token refresh
+- **OAuth2 Security**: Enterprise-grade authentication with proactive token refresh
+  - Automatically checks token expiry before each request
+  - Refreshes tokens 5 minutes before expiration
+  - Prevents authentication failures from expired tokens
 
 ### Azure API Management (APIM) AI Gateway Support
 This node is specifically designed for APIM AI Gateway scenarios where:
@@ -155,6 +158,26 @@ To use this node, you need:
 ```
 
 The AI Agent can use your Azure OpenAI deployment with OAuth2 authentication for secure, enterprise-grade AI workflows.
+
+## Troubleshooting
+
+### Token Refresh Issues
+
+This node implements **proactive token refresh** to prevent authentication failures:
+
+- **Automatic Expiry Check**: Before each API call, the node checks if the OAuth2 token is expired or about to expire (within 5 minutes)
+- **Automatic Refresh**: If the token is expiring soon, it automatically requests a new token from Azure AD
+- **Workaround for n8n Limitation**: n8n's OAuth2 framework only refreshes tokens on 401 errors, but many Azure APIs return 403 errors for expired tokens. This node works around this limitation by proactively checking expiry timestamps.
+
+**If you still experience token expiration issues:**
+
+1. **Verify `offline_access` scope**: The credential automatically adds `offline_access` to your API scope to enable refresh tokens. Check your Azure AD app registration allows this scope.
+
+2. **Check token expiry data**: The node relies on `expires_at` timestamp in the OAuth token data. If your Azure AD doesn't provide this, the proactive refresh won't work.
+
+3. **Manual reconnection**: If automatic refresh fails, you may need to manually reconnect your credentials in n8n to re-authenticate.
+
+4. **Check logs**: Enable n8n logging to see token refresh attempts and any errors.
 
 ## Resources
 

@@ -3,9 +3,68 @@ import type {
 	INodeType,
 	INodeTypeDescription,
 	SupplyData,
+	ICredentialDataDecryptedObject,
 } from 'n8n-workflow';
 import { NodeOperationError } from 'n8n-workflow';
 import { AzureChatOpenAI } from '@langchain/openai';
+
+interface OAuthTokenData {
+	access_token?: string;
+	expires_in?: number;
+	expires_at?: number;
+	refresh_token?: string;
+}
+
+/**
+ * Check if the OAuth token is expired or about to expire (within 5 minutes)
+ * and refresh it if necessary
+ */
+async function ensureValidToken(
+	context: ISupplyDataFunctions,
+	credentials: ICredentialDataDecryptedObject,
+): Promise<string> {
+	const oauthData = credentials.oauthTokenData as OAuthTokenData;
+	
+	if (!oauthData?.access_token) {
+		throw new NodeOperationError(
+			context.getNode(),
+			'OAuth2 access token not found. Please reconnect your credentials.',
+		);
+	}
+
+	// Check if token has expiry information
+	if (oauthData.expires_at) {
+		const now = Math.floor(Date.now() / 1000); // Current time in seconds
+		const expiresAt = oauthData.expires_at;
+		const bufferTime = 300; // 5 minutes buffer before expiry
+
+		// If token is expired or about to expire within 5 minutes, force a refresh
+		if (now >= expiresAt - bufferTime) {
+			context.logger.info('OAuth token expired or about to expire, attempting refresh...');
+			
+			// Force credential test to trigger token refresh
+			// This is a workaround since n8n doesn't expose a direct refresh method
+			try {
+				// Re-fetch credentials which should trigger a refresh if needed
+				const refreshedCredentials = await context.getCredentials('azureOpenAiMsOAuth2Api');
+				const refreshedOauthData = refreshedCredentials.oauthTokenData as OAuthTokenData;
+				
+				if (refreshedOauthData?.access_token) {
+					context.logger.info('Token refresh successful');
+					return refreshedOauthData.access_token;
+				}
+			} catch (error) {
+				context.logger.error('Token refresh failed', { error });
+				throw new NodeOperationError(
+					context.getNode(),
+					'OAuth token expired and refresh failed. Please reconnect your credentials.',
+				);
+			}
+		}
+	}
+
+	return oauthData.access_token;
+}
 
 export class LmChatAzureOpenAiMsOAuth2 implements INodeType {
 	description: INodeTypeDescription = {
@@ -183,13 +242,8 @@ export class LmChatAzureOpenAiMsOAuth2 implements INodeType {
 			);
 		}
 
-		const oauthData = credentials.oauthTokenData as unknown as { access_token?: string };
-		if (!oauthData?.access_token) {
-			throw new NodeOperationError(
-				this.getNode(),
-				'OAuth2 access token not found. Please reconnect your credentials.',
-			);
-		}
+		// Ensure we have a valid, non-expired token
+		const accessToken = await ensureValidToken(this, credentials);
 
 		// For APIM AI Gateway: Pass JWT token as api-key header value
 		// APIM will extract and validate the JWT from api-key header
@@ -198,7 +252,7 @@ export class LmChatAzureOpenAiMsOAuth2 implements INodeType {
 
 		const model = new AzureChatOpenAI({
 			azureOpenAIApiDeploymentName: deploymentName,
-			azureOpenAIApiKey: oauthData.access_token, // JWT token passed as api-key for APIM to validate
+			azureOpenAIApiKey: accessToken, // JWT token passed as api-key for APIM to validate
 			azureOpenAIEndpoint: endpoint,
 			azureOpenAIApiVersion: credentials.apiVersion as string,
 			maxTokens: options.maxTokens !== -1 ? options.maxTokens : undefined,

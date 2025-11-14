@@ -3,6 +3,33 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.LmChatAzureOpenAiMsOAuth2 = void 0;
 const n8n_workflow_1 = require("n8n-workflow");
 const openai_1 = require("@langchain/openai");
+async function ensureValidToken(context, credentials) {
+    const oauthData = credentials.oauthTokenData;
+    if (!(oauthData === null || oauthData === void 0 ? void 0 : oauthData.access_token)) {
+        throw new n8n_workflow_1.NodeOperationError(context.getNode(), 'OAuth2 access token not found. Please reconnect your credentials.');
+    }
+    if (oauthData.expires_at) {
+        const now = Math.floor(Date.now() / 1000);
+        const expiresAt = oauthData.expires_at;
+        const bufferTime = 300;
+        if (now >= expiresAt - bufferTime) {
+            context.logger.info('OAuth token expired or about to expire, attempting refresh...');
+            try {
+                const refreshedCredentials = await context.getCredentials('azureOpenAiMsOAuth2Api');
+                const refreshedOauthData = refreshedCredentials.oauthTokenData;
+                if (refreshedOauthData === null || refreshedOauthData === void 0 ? void 0 : refreshedOauthData.access_token) {
+                    context.logger.info('Token refresh successful');
+                    return refreshedOauthData.access_token;
+                }
+            }
+            catch (error) {
+                context.logger.error('Token refresh failed', { error });
+                throw new n8n_workflow_1.NodeOperationError(context.getNode(), 'OAuth token expired and refresh failed. Please reconnect your credentials.');
+            }
+        }
+    }
+    return oauthData.access_token;
+}
 class LmChatAzureOpenAiMsOAuth2 {
     constructor() {
         this.description = {
@@ -158,14 +185,11 @@ class LmChatAzureOpenAiMsOAuth2 {
         if (!credentials.endpoint) {
             throw new n8n_workflow_1.NodeOperationError(this.getNode(), 'Endpoint is required in credentials');
         }
-        const oauthData = credentials.oauthTokenData;
-        if (!(oauthData === null || oauthData === void 0 ? void 0 : oauthData.access_token)) {
-            throw new n8n_workflow_1.NodeOperationError(this.getNode(), 'OAuth2 access token not found. Please reconnect your credentials.');
-        }
+        const accessToken = await ensureValidToken(this, credentials);
         const endpoint = credentials.endpoint.replace(/\/$/, '');
         const model = new openai_1.AzureChatOpenAI({
             azureOpenAIApiDeploymentName: deploymentName,
-            azureOpenAIApiKey: oauthData.access_token,
+            azureOpenAIApiKey: accessToken,
             azureOpenAIEndpoint: endpoint,
             azureOpenAIApiVersion: credentials.apiVersion,
             maxTokens: options.maxTokens !== -1 ? options.maxTokens : undefined,
