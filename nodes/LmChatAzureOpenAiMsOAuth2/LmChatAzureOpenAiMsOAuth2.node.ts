@@ -3,7 +3,6 @@ import type {
 	INodeType,
 	INodeTypeDescription,
 	SupplyData,
-	ICredentialDataDecryptedObject,
 } from 'n8n-workflow';
 import { NodeOperationError } from 'n8n-workflow';
 import { AzureChatOpenAI } from '@langchain/openai';
@@ -16,13 +15,13 @@ interface OAuthTokenData {
 }
 
 /**
- * Check if the OAuth token is expired or about to expire (within 5 minutes)
- * and refresh it if necessary
+ * Get the current access token from credentials
+ * If token is expired or about to expire, makes a test request to trigger n8n's OAuth2 refresh
  */
-async function ensureValidToken(
+async function getCurrentToken(
 	context: ISupplyDataFunctions,
-	credentials: ICredentialDataDecryptedObject,
 ): Promise<string> {
+	const credentials = await context.getCredentials('azureOpenAiMsOAuth2Api');
 	const oauthData = credentials.oauthTokenData as OAuthTokenData;
 	
 	if (!oauthData?.access_token) {
@@ -32,33 +31,39 @@ async function ensureValidToken(
 		);
 	}
 
-	// Check if token has expiry information
+	// Check if token is expired or about to expire (within 5 minutes)
 	if (oauthData.expires_at) {
-		const now = Math.floor(Date.now() / 1000); // Current time in seconds
+		const now = Math.floor(Date.now() / 1000);
 		const expiresAt = oauthData.expires_at;
-		const bufferTime = 300; // 5 minutes buffer before expiry
+		const bufferTime = 300; // 5 minutes
 
-		// If token is expired or about to expire within 5 minutes, force a refresh
 		if (now >= expiresAt - bufferTime) {
-			context.logger.info('OAuth token expired or about to expire, attempting refresh...');
+			context.logger.info('Token expired or expiring soon, triggering refresh via test request...');
 			
-			// Force credential test to trigger token refresh
-			// This is a workaround since n8n doesn't expose a direct refresh method
 			try {
-				// Re-fetch credentials which should trigger a refresh if needed
+				// Make a test request using n8n's HTTP helper to trigger OAuth2 refresh
+				// This will cause n8n to refresh the token if it gets a 401 error
+				await context.helpers.httpRequestWithAuthentication.call(
+					context,
+					'azureOpenAiMsOAuth2Api',
+					{
+						url: `${credentials.endpoint}openai/deployments?api-version=${credentials.apiVersion}`,
+						method: 'GET',
+					},
+				);
+				
+				// Re-fetch credentials after the test request (token should be refreshed now)
 				const refreshedCredentials = await context.getCredentials('azureOpenAiMsOAuth2Api');
 				const refreshedOauthData = refreshedCredentials.oauthTokenData as OAuthTokenData;
 				
 				if (refreshedOauthData?.access_token) {
-					context.logger.info('Token refresh successful');
+					context.logger.info('Token refreshed successfully');
 					return refreshedOauthData.access_token;
 				}
 			} catch (error) {
-				context.logger.error('Token refresh failed', { error });
-				throw new NodeOperationError(
-					context.getNode(),
-					'OAuth token expired and refresh failed. Please reconnect your credentials.',
-				);
+				// If test request fails, log but continue with existing token
+				// The actual API call will fail and provide better error message
+				context.logger.warn('Token refresh test request failed, continuing with existing token', { error });
 			}
 		}
 	}
@@ -247,8 +252,8 @@ export class LmChatAzureOpenAiMsOAuth2 implements INodeType {
 				);
 			}
 
-			// Ensure we have a valid, non-expired token
-			const accessToken = await ensureValidToken(context, credentials);
+			// Get current access token
+			const accessToken = await getCurrentToken(context);
 			
 			return {
 				endpoint: (credentials.endpoint as string).replace(/\/$/, ''),
@@ -282,22 +287,47 @@ export class LmChatAzureOpenAiMsOAuth2 implements INodeType {
 				: undefined,
 		});
 
-		// Wrap the model to refresh token before each call
+		// Wrap the model to refresh token before each call and handle 401 errors
 		const originalInvoke = model.invoke.bind(model);
 		const originalStream = model.stream.bind(model);
 		
 		model.invoke = async function(input: any, options?: any) {
-			// Refresh token before invoke
+			// Get fresh token before invoke
 			const freshCreds = await getCredentialsWithFreshToken();
 			(this as any).azureOpenAIApiKey = freshCreds.accessToken;
-			return originalInvoke(input, options);
+			
+			try {
+				return await originalInvoke(input, options);
+			} catch (error: any) {
+				// If we get a 401 error, the token might have expired between fetch and use
+				// Retry once with a fresh token
+				if (error?.status === 401 || error?.response?.status === 401) {
+					context.logger.info('Received 401 error, retrying with fresh token...');
+					const retryCreds = await getCredentialsWithFreshToken();
+					(this as any).azureOpenAIApiKey = retryCreds.accessToken;
+					return await originalInvoke(input, options);
+				}
+				throw error;
+			}
 		};
 		
 		model.stream = async function(input: any, options?: any) {
-			// Refresh token before stream
+			// Get fresh token before stream
 			const freshCreds = await getCredentialsWithFreshToken();
 			(this as any).azureOpenAIApiKey = freshCreds.accessToken;
-			return originalStream(input, options);
+			
+			try {
+				return await originalStream(input, options);
+			} catch (error: any) {
+				// If we get a 401 error, retry with fresh token
+				if (error?.status === 401 || error?.response?.status === 401) {
+					context.logger.info('Received 401 error, retrying with fresh token...');
+					const retryCreds = await getCredentialsWithFreshToken();
+					(this as any).azureOpenAIApiKey = retryCreds.accessToken;
+					return await originalStream(input, options);
+				}
+				throw error;
+			}
 		};
 
 		return {

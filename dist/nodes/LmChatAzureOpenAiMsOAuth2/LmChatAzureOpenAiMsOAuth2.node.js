@@ -3,7 +3,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.LmChatAzureOpenAiMsOAuth2 = void 0;
 const n8n_workflow_1 = require("n8n-workflow");
 const openai_1 = require("@langchain/openai");
-async function ensureValidToken(context, credentials) {
+async function getCurrentToken(context) {
+    const credentials = await context.getCredentials('azureOpenAiMsOAuth2Api');
     const oauthData = credentials.oauthTokenData;
     if (!(oauthData === null || oauthData === void 0 ? void 0 : oauthData.access_token)) {
         throw new n8n_workflow_1.NodeOperationError(context.getNode(), 'OAuth2 access token not found. Please reconnect your credentials.');
@@ -13,18 +14,21 @@ async function ensureValidToken(context, credentials) {
         const expiresAt = oauthData.expires_at;
         const bufferTime = 300;
         if (now >= expiresAt - bufferTime) {
-            context.logger.info('OAuth token expired or about to expire, attempting refresh...');
+            context.logger.info('Token expired or expiring soon, triggering refresh via test request...');
             try {
+                await context.helpers.httpRequestWithAuthentication.call(context, 'azureOpenAiMsOAuth2Api', {
+                    url: `${credentials.endpoint}openai/deployments?api-version=${credentials.apiVersion}`,
+                    method: 'GET',
+                });
                 const refreshedCredentials = await context.getCredentials('azureOpenAiMsOAuth2Api');
                 const refreshedOauthData = refreshedCredentials.oauthTokenData;
                 if (refreshedOauthData === null || refreshedOauthData === void 0 ? void 0 : refreshedOauthData.access_token) {
-                    context.logger.info('Token refresh successful');
+                    context.logger.info('Token refreshed successfully');
                     return refreshedOauthData.access_token;
                 }
             }
             catch (error) {
-                context.logger.error('Token refresh failed', { error });
-                throw new n8n_workflow_1.NodeOperationError(context.getNode(), 'OAuth token expired and refresh failed. Please reconnect your credentials.');
+                context.logger.warn('Token refresh test request failed, continuing with existing token', { error });
             }
         }
     }
@@ -187,7 +191,7 @@ class LmChatAzureOpenAiMsOAuth2 {
             if (!credentials.endpoint) {
                 throw new n8n_workflow_1.NodeOperationError(context.getNode(), 'Endpoint is required in credentials');
             }
-            const accessToken = await ensureValidToken(context, credentials);
+            const accessToken = await getCurrentToken(context);
             return {
                 endpoint: credentials.endpoint.replace(/\/$/, ''),
                 apiVersion: credentials.apiVersion,
@@ -216,14 +220,38 @@ class LmChatAzureOpenAiMsOAuth2 {
         const originalInvoke = model.invoke.bind(model);
         const originalStream = model.stream.bind(model);
         model.invoke = async function (input, options) {
+            var _a;
             const freshCreds = await getCredentialsWithFreshToken();
             this.azureOpenAIApiKey = freshCreds.accessToken;
-            return originalInvoke(input, options);
+            try {
+                return await originalInvoke(input, options);
+            }
+            catch (error) {
+                if ((error === null || error === void 0 ? void 0 : error.status) === 401 || ((_a = error === null || error === void 0 ? void 0 : error.response) === null || _a === void 0 ? void 0 : _a.status) === 401) {
+                    context.logger.info('Received 401 error, retrying with fresh token...');
+                    const retryCreds = await getCredentialsWithFreshToken();
+                    this.azureOpenAIApiKey = retryCreds.accessToken;
+                    return await originalInvoke(input, options);
+                }
+                throw error;
+            }
         };
         model.stream = async function (input, options) {
+            var _a;
             const freshCreds = await getCredentialsWithFreshToken();
             this.azureOpenAIApiKey = freshCreds.accessToken;
-            return originalStream(input, options);
+            try {
+                return await originalStream(input, options);
+            }
+            catch (error) {
+                if ((error === null || error === void 0 ? void 0 : error.status) === 401 || ((_a = error === null || error === void 0 ? void 0 : error.response) === null || _a === void 0 ? void 0 : _a.status) === 401) {
+                    context.logger.info('Received 401 error, retrying with fresh token...');
+                    const retryCreds = await getCredentialsWithFreshToken();
+                    this.azureOpenAIApiKey = retryCreds.accessToken;
+                    return await originalStream(input, options);
+                }
+                throw error;
+            }
         };
         return {
             response: model,

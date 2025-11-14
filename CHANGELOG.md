@@ -2,7 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
-## [1.1.2] - 2025-01-XX
+## [1.1.3] - 2025-01-14
+
+### Fixed
+- **Proper Token Refresh with n8n's OAuth2 System**: Implemented working token refresh mechanism
+  - Uses `httpRequestWithAuthentication` helper to trigger n8n's OAuth2 refresh on expired tokens
+  - Makes a test API request when token is expired/expiring to force refresh
+  - Fetches refreshed credentials after test request
+  - Includes 401 error retry logic as fallback
+  - Solves the root issue: n8n only refreshes OAuth2 tokens when it sees 401 errors from HTTP requests
+
+### Changed
+- Improved token refresh to properly integrate with n8n's OAuth2 credential system
+- Added comprehensive logging for token refresh attempts
+
+## [1.1.2] - 2025-01-14
 
 ### Fixed
 - **Dynamic Token Refresh**: Model methods now fetch fresh OAuth2 tokens before each API call
