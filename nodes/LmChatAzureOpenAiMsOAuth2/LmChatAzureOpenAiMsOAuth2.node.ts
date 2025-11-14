@@ -191,20 +191,16 @@ export class LmChatAzureOpenAiMsOAuth2 implements INodeType {
 			);
 		}
 
-		// For APIM AI Gateway: Send JWT as Bearer token in Authorization header
-		// APIM will validate the JWT and use its own credentials to call Azure OpenAI backend
+		// For APIM AI Gateway: Pass JWT token as api-key header value
+		// APIM will extract and validate the JWT from api-key header
+		// APIM then uses its own credentials to call Azure OpenAI backend
 		const endpoint = (credentials.endpoint as string).replace(/\/$/, ''); // Remove trailing slash
 
 		const model = new AzureChatOpenAI({
 			azureOpenAIApiDeploymentName: deploymentName,
-			azureOpenAIApiKey: 'dummy-key', // Required by SDK but not used - JWT is in Authorization header
+			azureOpenAIApiKey: oauthData.access_token, // JWT token passed as api-key for APIM to validate
 			azureOpenAIEndpoint: endpoint,
 			azureOpenAIApiVersion: credentials.apiVersion as string,
-			configuration: {
-				defaultHeaders: {
-					Authorization: `Bearer ${oauthData.access_token}`,
-				},
-			},
 			maxTokens: options.maxTokens !== -1 ? options.maxTokens : undefined,
 			temperature: options.temperature,
 			topP: options.topP,

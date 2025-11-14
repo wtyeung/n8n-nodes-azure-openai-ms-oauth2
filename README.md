@@ -43,7 +43,7 @@ Or install directly in n8n:
 
 ### Azure API Management (APIM) AI Gateway Support
 This node is specifically designed for APIM AI Gateway scenarios where:
-- **n8n sends JWT token** → APIM validates the OAuth2 JWT in `Authorization: Bearer` header
+- **n8n sends JWT token** → APIM validates the OAuth2 JWT in `api-key` header
 - **APIM authenticates to Azure OpenAI** → APIM uses its own credentials (API key or managed identity)
 - **Centralized Management**: Route requests through APIM for unified API governance
 - **Advanced Monitoring**: Track usage, performance, and costs across all AI services
@@ -95,16 +95,16 @@ To use this node, you need:
    - **Tenant ID**: Your Azure AD tenant ID
 
 5. **APIM Configuration**:
-   - Configure APIM to validate the JWT token in the `Authorization: Bearer` header
+   - Configure APIM to validate the JWT token in the `api-key` header
    - Set up APIM policies to validate the `aud` claim matches your API scope
    - Configure APIM backend to point to your Azure OpenAI resource
    - APIM will rewrite the URL from your APIM path to the Azure OpenAI endpoint
    - Example flow:
      - n8n calls: `https://your-apim.azure-api.net/aiProject/deployments/gpt-4/chat/completions`
-     - n8n sends: `Authorization: Bearer <jwt-token>`
-     - APIM validates JWT from Authorization header
+     - n8n sends: `api-key: <jwt-token>`
+     - APIM extracts and validates JWT from `api-key` header
      - APIM rewrites to: `https://your-resource.openai.azure.com/openai/deployments/gpt-4/chat/completions`
-     - APIM adds `api-key` header with actual Azure OpenAI credentials
+     - APIM replaces `api-key` header with actual Azure OpenAI credentials
    - APIM validates the JWT and forwards requests to Azure OpenAI with its own credentials
 
 ## Compatibility

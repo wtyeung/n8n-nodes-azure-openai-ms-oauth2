@@ -1,6 +1,6 @@
 {
   "name": "n8n-nodes-azure-openai-ms-oauth2",
-  "version": "0.12.0",
+  "version": "1.0.0",
   "description": "Azure OpenAI Chat Model with MS OAuth2 for n8n",
   "license": "MIT",
   "homepage": "https://github.com/wtyeung/n8n-nodes-azure-openai-ms-oauth2",
