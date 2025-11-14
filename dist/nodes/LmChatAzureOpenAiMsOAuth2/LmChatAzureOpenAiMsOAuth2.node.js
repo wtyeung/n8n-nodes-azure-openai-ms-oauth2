@@ -165,9 +165,14 @@ class LmChatAzureOpenAiMsOAuth2 {
         const endpoint = credentials.endpoint.replace(/\/$/, '');
         const model = new openai_1.AzureChatOpenAI({
             azureOpenAIApiDeploymentName: deploymentName,
-            azureOpenAIApiKey: oauthData.access_token,
+            azureOpenAIApiKey: 'dummy-key',
             azureOpenAIEndpoint: endpoint,
             azureOpenAIApiVersion: credentials.apiVersion,
+            configuration: {
+                defaultHeaders: {
+                    Authorization: `Bearer ${oauthData.access_token}`,
+                },
+            },
             maxTokens: options.maxTokens !== -1 ? options.maxTokens : undefined,
             temperature: options.temperature,
             topP: options.topP,
