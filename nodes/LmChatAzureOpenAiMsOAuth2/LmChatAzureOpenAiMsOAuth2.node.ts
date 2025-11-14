@@ -135,7 +135,7 @@ async function getCurrentToken(
 	if (expiryTime) {
 		const now = Math.floor(Date.now() / 1000);
 		const expiresAt = expiryTime;
-		const bufferTime = 300; // 5 minutes
+		const bufferTime = 900; // 15 minutes - ensures token remains valid during long workflow executions
 
 		if (now >= expiresAt - bufferTime) {
 			context.logger.info(`Token expired or expiring soon (expires at ${new Date(expiresAt * 1000).toISOString()}), triggering refresh via test request...`);
@@ -350,7 +350,7 @@ export class LmChatAzureOpenAiMsOAuth2 implements INodeType {
 	};
 
 	async supplyData(this: ISupplyDataFunctions, itemIndex: number): Promise<SupplyData> {
-		this.logger.info('=== supplyData called for Azure OpenAI Chat Model (MS OAuth2) v1.2.2 ===');
+		this.logger.info('=== supplyData called for Azure OpenAI Chat Model (MS OAuth2) v1.2.3 ===');
 		
 		const deploymentName = this.getNodeParameter('deploymentName', itemIndex) as string;
 		const options = this.getNodeParameter('options', itemIndex, {}) as {

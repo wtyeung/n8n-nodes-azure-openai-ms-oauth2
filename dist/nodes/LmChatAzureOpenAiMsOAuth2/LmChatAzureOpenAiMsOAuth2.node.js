@@ -76,7 +76,7 @@ async function getCurrentToken(context, deploymentName) {
     if (expiryTime) {
         const now = Math.floor(Date.now() / 1000);
         const expiresAt = expiryTime;
-        const bufferTime = 300;
+        const bufferTime = 900;
         if (now >= expiresAt - bufferTime) {
             context.logger.info(`Token expired or expiring soon (expires at ${new Date(expiresAt * 1000).toISOString()}), triggering refresh via test request...`);
             try {
@@ -273,7 +273,7 @@ class LmChatAzureOpenAiMsOAuth2 {
     }
     async supplyData(itemIndex) {
         var _a, _b;
-        this.logger.info('=== supplyData called for Azure OpenAI Chat Model (MS OAuth2) v1.2.2 ===');
+        this.logger.info('=== supplyData called for Azure OpenAI Chat Model (MS OAuth2) v1.2.3 ===');
         const deploymentName = this.getNodeParameter('deploymentName', itemIndex);
         const options = this.getNodeParameter('options', itemIndex, {});
         const context = this;
