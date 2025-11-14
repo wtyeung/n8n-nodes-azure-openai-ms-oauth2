@@ -19,7 +19,6 @@ function decodeJWT(token) {
     }
 }
 async function getCurrentToken(context, deploymentName) {
-    var _a;
     const credentials = await context.getCredentials('azureOpenAiMsOAuth2Api');
     const oauthData = credentials.oauthTokenData;
     if (!(oauthData === null || oauthData === void 0 ? void 0 : oauthData.access_token)) {
@@ -78,41 +77,41 @@ async function getCurrentToken(context, deploymentName) {
         const expiresAt = expiryTime;
         const bufferTime = 900;
         if (now >= expiresAt - bufferTime) {
-            context.logger.info(`Token expired or expiring soon (expires at ${new Date(expiresAt * 1000).toISOString()}), triggering refresh via test request...`);
+            context.logger.info(`Token expired or expiring soon (expires at ${new Date(expiresAt * 1000).toISOString()}), triggering refresh...`);
+            if (!oauthData.refresh_token) {
+                context.logger.warn('No refresh token available - cannot refresh proactively');
+                return oauthData.access_token;
+            }
             try {
-                await context.helpers.httpRequestWithAuthentication.call(context, 'azureOpenAiMsOAuth2Api', {
-                    url: `${credentials.endpoint}openai/deployments?api-version=${credentials.apiVersion}`,
-                    method: 'GET',
+                context.logger.info('Manually refreshing token using refresh_token...');
+                const tokenUrl = credentials.accessTokenUrl;
+                const refreshToken = oauthData.refresh_token;
+                const response = await context.helpers.request({
+                    method: 'POST',
+                    url: tokenUrl,
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: new URLSearchParams({
+                        grant_type: 'refresh_token',
+                        refresh_token: refreshToken,
+                        client_id: credentials.clientId,
+                        client_secret: credentials.clientSecret,
+                        scope: credentials.scope || 'openid profile email',
+                    }).toString(),
+                    json: false,
                 });
-                context.logger.info('Test request succeeded, fetching refreshed credentials...');
-                const refreshedCredentials = await context.getCredentials('azureOpenAiMsOAuth2Api');
-                const refreshedOauthData = refreshedCredentials.oauthTokenData;
-                if ((refreshedOauthData === null || refreshedOauthData === void 0 ? void 0 : refreshedOauthData.access_token) && refreshedOauthData.access_token !== oauthData.access_token) {
-                    context.logger.info('Token refreshed successfully - new token received');
-                    return refreshedOauthData.access_token;
-                }
-                else if (refreshedOauthData === null || refreshedOauthData === void 0 ? void 0 : refreshedOauthData.access_token) {
-                    context.logger.info('Token still valid after test request');
-                    return refreshedOauthData.access_token;
+                const tokenData = JSON.parse(response);
+                if (tokenData.access_token) {
+                    context.logger.info('Token refreshed successfully via manual refresh');
+                    return tokenData.access_token;
                 }
             }
             catch (error) {
-                context.logger.error('Token refresh test request failed', {
+                context.logger.error('Manual token refresh failed', {
                     error: error.message,
-                    status: error.statusCode || error.status,
-                    response: ((_a = error.response) === null || _a === void 0 ? void 0 : _a.body) || error.response
+                    statusCode: error.statusCode
                 });
-                try {
-                    const refreshedCredentials = await context.getCredentials('azureOpenAiMsOAuth2Api');
-                    const refreshedOauthData = refreshedCredentials.oauthTokenData;
-                    if ((refreshedOauthData === null || refreshedOauthData === void 0 ? void 0 : refreshedOauthData.access_token) && refreshedOauthData.access_token !== oauthData.access_token) {
-                        context.logger.info('Token was refreshed despite error');
-                        return refreshedOauthData.access_token;
-                    }
-                }
-                catch (e) {
-                    context.logger.error('Failed to fetch credentials after error', { error: e });
-                }
             }
         }
         else {
@@ -273,7 +272,7 @@ class LmChatAzureOpenAiMsOAuth2 {
     }
     async supplyData(itemIndex) {
         var _a, _b;
-        this.logger.info('=== supplyData called for Azure OpenAI Chat Model (MS OAuth2) v1.2.3 ===');
+        this.logger.info('=== supplyData called for Azure OpenAI Chat Model (MS OAuth2) v1.2.4 ===');
         const deploymentName = this.getNodeParameter('deploymentName', itemIndex);
         const options = this.getNodeParameter('options', itemIndex, {});
         const context = this;
