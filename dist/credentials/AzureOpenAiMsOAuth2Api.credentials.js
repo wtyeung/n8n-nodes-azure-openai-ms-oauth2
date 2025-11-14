@@ -13,7 +13,7 @@ class AzureOpenAiMsOAuth2Api {
                 displayName: 'Scope',
                 name: 'scope',
                 type: 'hidden',
-                default: '=offline_access {{$self.apiScope}}',
+                default: '={{$self.apiScope.includes("offline_access") ? $self.apiScope : "offline_access " + $self.apiScope}}',
             },
             {
                 displayName: 'API Scope',
