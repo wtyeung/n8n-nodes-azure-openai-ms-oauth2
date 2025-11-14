@@ -215,7 +215,7 @@ class LmChatAzureOpenAiMsOAuth2 {
     }
     async supplyData(itemIndex) {
         var _a, _b;
-        this.logger.info('=== supplyData called for Azure OpenAI Chat Model (MS OAuth2) v1.1.3 ===');
+        this.logger.info('=== supplyData called for Azure OpenAI Chat Model (MS OAuth2) v1.1.4 ===');
         const deploymentName = this.getNodeParameter('deploymentName', itemIndex);
         const options = this.getNodeParameter('options', itemIndex, {});
         const context = this;

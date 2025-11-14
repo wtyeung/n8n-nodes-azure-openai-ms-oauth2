@@ -256,7 +256,7 @@ export class LmChatAzureOpenAiMsOAuth2 implements INodeType {
 	};
 
 	async supplyData(this: ISupplyDataFunctions, itemIndex: number): Promise<SupplyData> {
-		this.logger.info('=== supplyData called for Azure OpenAI Chat Model (MS OAuth2) v1.1.3 ===');
+		this.logger.info('=== supplyData called for Azure OpenAI Chat Model (MS OAuth2) v1.1.4 ===');
 		
 		const deploymentName = this.getNodeParameter('deploymentName', itemIndex) as string;
 		const options = this.getNodeParameter('options', itemIndex, {}) as {
