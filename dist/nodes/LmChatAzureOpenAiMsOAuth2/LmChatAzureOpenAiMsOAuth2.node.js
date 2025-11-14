@@ -179,19 +179,27 @@ class LmChatAzureOpenAiMsOAuth2 {
     }
     async supplyData(itemIndex) {
         var _a, _b;
-        const credentials = await this.getCredentials('azureOpenAiMsOAuth2Api');
         const deploymentName = this.getNodeParameter('deploymentName', itemIndex);
         const options = this.getNodeParameter('options', itemIndex, {});
-        if (!credentials.endpoint) {
-            throw new n8n_workflow_1.NodeOperationError(this.getNode(), 'Endpoint is required in credentials');
-        }
-        const accessToken = await ensureValidToken(this, credentials);
-        const endpoint = credentials.endpoint.replace(/\/$/, '');
+        const context = this;
+        const getCredentialsWithFreshToken = async () => {
+            const credentials = await context.getCredentials('azureOpenAiMsOAuth2Api');
+            if (!credentials.endpoint) {
+                throw new n8n_workflow_1.NodeOperationError(context.getNode(), 'Endpoint is required in credentials');
+            }
+            const accessToken = await ensureValidToken(context, credentials);
+            return {
+                endpoint: credentials.endpoint.replace(/\/$/, ''),
+                apiVersion: credentials.apiVersion,
+                accessToken,
+            };
+        };
+        const initialCreds = await getCredentialsWithFreshToken();
         const model = new openai_1.AzureChatOpenAI({
             azureOpenAIApiDeploymentName: deploymentName,
-            azureOpenAIApiKey: accessToken,
-            azureOpenAIEndpoint: endpoint,
-            azureOpenAIApiVersion: credentials.apiVersion,
+            azureOpenAIApiKey: initialCreds.accessToken,
+            azureOpenAIEndpoint: initialCreds.endpoint,
+            azureOpenAIApiVersion: initialCreds.apiVersion,
             maxTokens: options.maxTokens !== -1 ? options.maxTokens : undefined,
             temperature: options.temperature,
             topP: options.topP,
@@ -205,6 +213,18 @@ class LmChatAzureOpenAiMsOAuth2 {
                 }
                 : undefined,
         });
+        const originalInvoke = model.invoke.bind(model);
+        const originalStream = model.stream.bind(model);
+        model.invoke = async function (input, options) {
+            const freshCreds = await getCredentialsWithFreshToken();
+            this.azureOpenAIApiKey = freshCreds.accessToken;
+            return originalInvoke(input, options);
+        };
+        model.stream = async function (input, options) {
+            const freshCreds = await getCredentialsWithFreshToken();
+            this.azureOpenAIApiKey = freshCreds.accessToken;
+            return originalStream(input, options);
+        };
         return {
             response: model,
         };

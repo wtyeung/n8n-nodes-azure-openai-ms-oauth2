@@ -163,11 +163,13 @@ The AI Agent can use your Azure OpenAI deployment with OAuth2 authentication for
 
 ### Token Refresh Issues
 
-This node implements **proactive token refresh** to prevent authentication failures:
+This node implements **dynamic token refresh** to prevent authentication failures:
 
-- **Automatic Expiry Check**: Before each API call, the node checks if the OAuth2 token is expired or about to expire (within 5 minutes)
+- **Invocation-Time Refresh**: The node fetches a fresh OAuth2 token before each `invoke()` or `stream()` call
+- **Automatic Expiry Check**: Checks if the token is expired or about to expire (within 5 minutes) before each API call
 - **Automatic Refresh**: If the token is expiring soon, it automatically requests a new token from Azure AD
-- **Workaround for n8n Limitation**: n8n's OAuth2 framework only refreshes tokens on 401 errors, but many Azure APIs return 403 errors for expired tokens. This node works around this limitation by proactively checking expiry timestamps.
+- **Model Instance Reuse**: Even when the LangChain model instance is reused across workflow executions, the token is always fresh
+- **Workaround for LangChain Limitation**: LangChain's `AzureChatOpenAI` doesn't support dynamic credentials, so this node wraps the model methods to inject fresh tokens on each call
 
 **If you still experience token expiration issues:**
 

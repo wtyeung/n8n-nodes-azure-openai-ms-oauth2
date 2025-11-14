@@ -221,8 +221,6 @@ export class LmChatAzureOpenAiMsOAuth2 implements INodeType {
 	};
 
 	async supplyData(this: ISupplyDataFunctions, itemIndex: number): Promise<SupplyData> {
-		const credentials = await this.getCredentials('azureOpenAiMsOAuth2Api');
-
 		const deploymentName = this.getNodeParameter('deploymentName', itemIndex) as string;
 		const options = this.getNodeParameter('options', itemIndex, {}) as {
 			maxTokens?: number;
@@ -235,26 +233,41 @@ export class LmChatAzureOpenAiMsOAuth2 implements INodeType {
 			responseFormat?: string;
 		};
 
-		if (!credentials.endpoint) {
-			throw new NodeOperationError(
-				this.getNode(),
-				'Endpoint is required in credentials',
-			);
-		}
+		// Store context reference for token refresh
+		const context = this;
+		
+		// Create a wrapper that provides fresh credentials on each call
+		const getCredentialsWithFreshToken = async () => {
+			const credentials = await context.getCredentials('azureOpenAiMsOAuth2Api');
+			
+			if (!credentials.endpoint) {
+				throw new NodeOperationError(
+					context.getNode(),
+					'Endpoint is required in credentials',
+				);
+			}
 
-		// Ensure we have a valid, non-expired token
-		const accessToken = await ensureValidToken(this, credentials);
+			// Ensure we have a valid, non-expired token
+			const accessToken = await ensureValidToken(context, credentials);
+			
+			return {
+				endpoint: (credentials.endpoint as string).replace(/\/$/, ''),
+				apiVersion: credentials.apiVersion as string,
+				accessToken,
+			};
+		};
 
-		// For APIM AI Gateway: Pass JWT token as api-key header value
-		// APIM will extract and validate the JWT from api-key header
-		// APIM then uses its own credentials to call Azure OpenAI backend
-		const endpoint = (credentials.endpoint as string).replace(/\/$/, ''); // Remove trailing slash
+		// Get initial credentials
+		const initialCreds = await getCredentialsWithFreshToken();
 
+		// Create model with configuration that will be used
+		// Note: We need to recreate the model on each invocation to get fresh tokens
+		// This is a workaround for LangChain not supporting dynamic token refresh
 		const model = new AzureChatOpenAI({
 			azureOpenAIApiDeploymentName: deploymentName,
-			azureOpenAIApiKey: accessToken, // JWT token passed as api-key for APIM to validate
-			azureOpenAIEndpoint: endpoint,
-			azureOpenAIApiVersion: credentials.apiVersion as string,
+			azureOpenAIApiKey: initialCreds.accessToken, // JWT token passed as api-key for APIM to validate
+			azureOpenAIEndpoint: initialCreds.endpoint,
+			azureOpenAIApiVersion: initialCreds.apiVersion,
 			maxTokens: options.maxTokens !== -1 ? options.maxTokens : undefined,
 			temperature: options.temperature,
 			topP: options.topP,
@@ -268,6 +281,24 @@ export class LmChatAzureOpenAiMsOAuth2 implements INodeType {
 					}
 				: undefined,
 		});
+
+		// Wrap the model to refresh token before each call
+		const originalInvoke = model.invoke.bind(model);
+		const originalStream = model.stream.bind(model);
+		
+		model.invoke = async function(input: any, options?: any) {
+			// Refresh token before invoke
+			const freshCreds = await getCredentialsWithFreshToken();
+			(this as any).azureOpenAIApiKey = freshCreds.accessToken;
+			return originalInvoke(input, options);
+		};
+		
+		model.stream = async function(input: any, options?: any) {
+			// Refresh token before stream
+			const freshCreds = await getCredentialsWithFreshToken();
+			(this as any).azureOpenAIApiKey = freshCreds.accessToken;
+			return originalStream(input, options);
+		};
 
 		return {
 			response: model,
