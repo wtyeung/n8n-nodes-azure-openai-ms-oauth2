@@ -153,104 +153,108 @@ async function getCurrentToken(
 		}
 
 		if (now >= expiresAt - bufferTime) {
-			context.logger.info(`Token expired or expiring soon (expires at ${new Date(expiresAt * 1000).toISOString()}), triggering refresh...`);
+			const isExpired = now >= expiresAt;
+			const minutesUntilExpiry = Math.floor((expiresAt - now) / 60);
 			
-			// Strategy: Try HTTP request first (triggers n8n's OAuth2 refresh on 401)
-			// If that fails, fallback to manual refresh token grant
+			context.logger.info(`Token ${isExpired ? 'expired' : `expiring soon (in ${minutesUntilExpiry} minutes)`} (expires at ${new Date(expiresAt * 1000).toISOString()}), triggering refresh...`);
 			
-			try {
-				// Try to trigger n8n's OAuth2 refresh by making a test request
-				// This works if the token is actually expired (401 response)
-				context.logger.info('🔄 REFRESH METHOD 1: Attempting refresh via test HTTP request...');
-				
-				// Use the chat completions endpoint with a minimal POST request
-				const testUrl = `${credentials.endpoint}openai/deployments/${deploymentName}/chat/completions?api-version=${credentials.apiVersion}`;
-				
-				await context.helpers.httpRequestWithAuthentication.call(
-					context,
-					'azureOpenAiMsOAuth2Api',
-					{
-						url: testUrl,
-						method: 'POST',
-						body: {
-							messages: [{ role: 'user', content: 'test' }],
-							max_tokens: 1,
-						},
-						json: true,
-					},
-				);
-				
-				context.logger.info('Test request succeeded, fetching refreshed credentials...');
-				
-				// Re-fetch credentials after potential refresh
-				const refreshedCredentials = await context.getCredentials('azureOpenAiMsOAuth2Api');
-				const refreshedOauthData = refreshedCredentials.oauthTokenData as OAuthTokenData;
-				
-				if (refreshedOauthData?.access_token && refreshedOauthData.access_token !== oauthData.access_token) {
-					context.logger.info('✅ SUCCESS: Token was refreshed via HTTP request (Method 1)');
-					return refreshedOauthData.access_token;
-				}
-				
-				context.logger.info('ℹ️ Token unchanged after test request, will use existing token');
-				return oauthData.access_token;
-				
-			} catch {
-				// HTTP request failed - try manual refresh as fallback
-				context.logger.info('❌ Method 1 failed, trying Method 2...');
-				context.logger.info('🔄 REFRESH METHOD 2: Manual refresh token grant...');
-				
-				if (!oauthData.refresh_token) {
-					context.logger.warn('No refresh token available - cannot refresh proactively');
-					return oauthData.access_token;
-				}
+			// Strategy:
+			// - If already expired: Use HTTP request (will get 401, triggers n8n's OAuth2 refresh)
+			// - If not expired but close: Use manual refresh_token grant (proactive, no API call)
+			
+			if (isExpired) {
+				// Token is already expired - use HTTP request to trigger n8n's OAuth2 refresh
+				context.logger.info('🔄 Token EXPIRED: Using HTTP request to trigger n8n OAuth2 refresh...');
 				
 				try {
-					// Manually refresh the token using Azure AD token endpoint
-					const tokenUrl = credentials.accessTokenUrl as string;
-					const refreshToken = oauthData.refresh_token;
-					const clientId = credentials.clientId as string;
-					const clientSecret = credentials.clientSecret as string;
+					const testUrl = `${credentials.endpoint}openai/deployments/${deploymentName}/chat/completions?api-version=${credentials.apiVersion}`;
 					
-					// Get the API scope from credentials
-					const apiScope = credentials.apiScope as string;
-					const scope = `offline_access ${apiScope}`;
-					
-					context.logger.info('Manual refresh parameters', {
-						tokenUrl,
-						clientId,
-						hasRefreshToken: !!refreshToken,
-						apiScope,
-						fullScope: scope
-					});
-					
-					const response = await context.helpers.request({
-						method: 'POST',
-						url: tokenUrl,
-						headers: {
-							'Content-Type': 'application/x-www-form-urlencoded',
+					await context.helpers.httpRequestWithAuthentication.call(
+						context,
+						'azureOpenAiMsOAuth2Api',
+						{
+							url: testUrl,
+							method: 'POST',
+							body: {
+								messages: [{ role: 'user', content: 'test' }],
+								max_tokens: 1,
+							},
+							json: true,
 						},
-						body: new URLSearchParams({
-							grant_type: 'refresh_token',
-							refresh_token: refreshToken,
-							client_id: clientId,
-							client_secret: clientSecret,
-							scope: scope,
-						}).toString(),
-						json: false,
-					});
+					);
 					
-					const tokenData = JSON.parse(response as string);
+					// Re-fetch credentials after n8n's automatic refresh
+					const refreshedCredentials = await context.getCredentials('azureOpenAiMsOAuth2Api');
+					const refreshedOauthData = refreshedCredentials.oauthTokenData as OAuthTokenData;
 					
-					if (tokenData.access_token) {
-						context.logger.info('✅ SUCCESS: Token refreshed successfully via manual refresh (Method 2)');
-						return tokenData.access_token;
+					if (refreshedOauthData?.access_token && refreshedOauthData.access_token !== oauthData.access_token) {
+						context.logger.info('✅ SUCCESS: Token refreshed via HTTP request (n8n OAuth2)');
+						return refreshedOauthData.access_token;
 					}
-				} catch (refreshError) {
-					context.logger.error('❌ FAILED: Both refresh methods failed', { 
-						error: (refreshError as Error).message
+					
+					context.logger.warn('Token unchanged after HTTP request, using existing token');
+					return oauthData.access_token;
+					
+				} catch (httpError) {
+					context.logger.warn('HTTP request failed, falling back to manual refresh', {
+						error: (httpError as Error).message
 					});
-					// Continue with existing token - it might still work for a few more minutes
+					// Fall through to manual refresh
 				}
+			}
+			
+			// Token not expired yet but close, OR HTTP request failed
+			// Use manual refresh_token grant (proactive)
+			context.logger.info('🔄 Token expiring soon: Using manual refresh_token grant...');
+			
+			if (!oauthData.refresh_token) {
+				context.logger.warn('No refresh token available - cannot refresh proactively');
+				return oauthData.access_token;
+			}
+			
+			try {
+				const tokenUrl = credentials.accessTokenUrl as string;
+				const refreshToken = oauthData.refresh_token;
+				const clientId = credentials.clientId as string;
+				const clientSecret = credentials.clientSecret as string;
+				const apiScope = credentials.apiScope as string;
+				const scope = `offline_access ${apiScope}`;
+				
+				context.logger.info('Manual refresh parameters', {
+					tokenUrl,
+					clientId,
+					hasRefreshToken: !!refreshToken,
+					apiScope,
+					fullScope: scope
+				});
+				
+				const response = await context.helpers.request({
+					method: 'POST',
+					url: tokenUrl,
+					headers: {
+						'Content-Type': 'application/x-www-form-urlencoded',
+					},
+					body: new URLSearchParams({
+						grant_type: 'refresh_token',
+						refresh_token: refreshToken,
+						client_id: clientId,
+						client_secret: clientSecret,
+						scope: scope,
+					}).toString(),
+					json: false,
+				});
+				
+				const tokenData = JSON.parse(response as string);
+				
+				if (tokenData.access_token) {
+					context.logger.info('✅ SUCCESS: Token refreshed via manual refresh_token grant');
+					return tokenData.access_token;
+				}
+			} catch (refreshError) {
+				context.logger.error('❌ FAILED: Manual token refresh failed', { 
+					error: (refreshError as Error).message
+				});
+				// Continue with existing token - it might still work for a few more minutes
 			}
 		} else {
 			context.logger.info(`✓ Token still valid, expires in ${Math.floor((expiresAt - now) / 60)} minutes`);
@@ -417,7 +421,7 @@ export class LmChatAzureOpenAiMsOAuth2 implements INodeType {
 	};
 
 	async supplyData(this: ISupplyDataFunctions, itemIndex: number): Promise<SupplyData> {
-		this.logger.info('=== supplyData called for Azure OpenAI Chat Model (MS OAuth2) v1.3.1 ===');
+		this.logger.info('=== supplyData called for Azure OpenAI Chat Model (MS OAuth2) v1.3.2 ===');
 		
 		const deploymentName = this.getNodeParameter('deploymentName', itemIndex) as string;
 		const options = this.getNodeParameter('options', itemIndex, {}) as {

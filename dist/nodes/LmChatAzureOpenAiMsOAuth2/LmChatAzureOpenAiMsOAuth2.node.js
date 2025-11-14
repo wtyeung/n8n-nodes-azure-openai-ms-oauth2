@@ -87,76 +87,81 @@ async function getCurrentToken(context, deploymentName) {
             }
         }
         if (now >= expiresAt - bufferTime) {
-            context.logger.info(`Token expired or expiring soon (expires at ${new Date(expiresAt * 1000).toISOString()}), triggering refresh...`);
-            try {
-                context.logger.info('🔄 REFRESH METHOD 1: Attempting refresh via test HTTP request...');
-                const testUrl = `${credentials.endpoint}openai/deployments/${deploymentName}/chat/completions?api-version=${credentials.apiVersion}`;
-                await context.helpers.httpRequestWithAuthentication.call(context, 'azureOpenAiMsOAuth2Api', {
-                    url: testUrl,
-                    method: 'POST',
-                    body: {
-                        messages: [{ role: 'user', content: 'test' }],
-                        max_tokens: 1,
-                    },
-                    json: true,
-                });
-                context.logger.info('Test request succeeded, fetching refreshed credentials...');
-                const refreshedCredentials = await context.getCredentials('azureOpenAiMsOAuth2Api');
-                const refreshedOauthData = refreshedCredentials.oauthTokenData;
-                if ((refreshedOauthData === null || refreshedOauthData === void 0 ? void 0 : refreshedOauthData.access_token) && refreshedOauthData.access_token !== oauthData.access_token) {
-                    context.logger.info('✅ SUCCESS: Token was refreshed via HTTP request (Method 1)');
-                    return refreshedOauthData.access_token;
-                }
-                context.logger.info('ℹ️ Token unchanged after test request, will use existing token');
-                return oauthData.access_token;
-            }
-            catch {
-                context.logger.info('❌ Method 1 failed, trying Method 2...');
-                context.logger.info('🔄 REFRESH METHOD 2: Manual refresh token grant...');
-                if (!oauthData.refresh_token) {
-                    context.logger.warn('No refresh token available - cannot refresh proactively');
+            const isExpired = now >= expiresAt;
+            const minutesUntilExpiry = Math.floor((expiresAt - now) / 60);
+            context.logger.info(`Token ${isExpired ? 'expired' : `expiring soon (in ${minutesUntilExpiry} minutes)`} (expires at ${new Date(expiresAt * 1000).toISOString()}), triggering refresh...`);
+            if (isExpired) {
+                context.logger.info('🔄 Token EXPIRED: Using HTTP request to trigger n8n OAuth2 refresh...');
+                try {
+                    const testUrl = `${credentials.endpoint}openai/deployments/${deploymentName}/chat/completions?api-version=${credentials.apiVersion}`;
+                    await context.helpers.httpRequestWithAuthentication.call(context, 'azureOpenAiMsOAuth2Api', {
+                        url: testUrl,
+                        method: 'POST',
+                        body: {
+                            messages: [{ role: 'user', content: 'test' }],
+                            max_tokens: 1,
+                        },
+                        json: true,
+                    });
+                    const refreshedCredentials = await context.getCredentials('azureOpenAiMsOAuth2Api');
+                    const refreshedOauthData = refreshedCredentials.oauthTokenData;
+                    if ((refreshedOauthData === null || refreshedOauthData === void 0 ? void 0 : refreshedOauthData.access_token) && refreshedOauthData.access_token !== oauthData.access_token) {
+                        context.logger.info('✅ SUCCESS: Token refreshed via HTTP request (n8n OAuth2)');
+                        return refreshedOauthData.access_token;
+                    }
+                    context.logger.warn('Token unchanged after HTTP request, using existing token');
                     return oauthData.access_token;
                 }
-                try {
-                    const tokenUrl = credentials.accessTokenUrl;
-                    const refreshToken = oauthData.refresh_token;
-                    const clientId = credentials.clientId;
-                    const clientSecret = credentials.clientSecret;
-                    const apiScope = credentials.apiScope;
-                    const scope = `offline_access ${apiScope}`;
-                    context.logger.info('Manual refresh parameters', {
-                        tokenUrl,
-                        clientId,
-                        hasRefreshToken: !!refreshToken,
-                        apiScope,
-                        fullScope: scope
-                    });
-                    const response = await context.helpers.request({
-                        method: 'POST',
-                        url: tokenUrl,
-                        headers: {
-                            'Content-Type': 'application/x-www-form-urlencoded',
-                        },
-                        body: new URLSearchParams({
-                            grant_type: 'refresh_token',
-                            refresh_token: refreshToken,
-                            client_id: clientId,
-                            client_secret: clientSecret,
-                            scope: scope,
-                        }).toString(),
-                        json: false,
-                    });
-                    const tokenData = JSON.parse(response);
-                    if (tokenData.access_token) {
-                        context.logger.info('✅ SUCCESS: Token refreshed successfully via manual refresh (Method 2)');
-                        return tokenData.access_token;
-                    }
-                }
-                catch (refreshError) {
-                    context.logger.error('❌ FAILED: Both refresh methods failed', {
-                        error: refreshError.message
+                catch (httpError) {
+                    context.logger.warn('HTTP request failed, falling back to manual refresh', {
+                        error: httpError.message
                     });
                 }
+            }
+            context.logger.info('🔄 Token expiring soon: Using manual refresh_token grant...');
+            if (!oauthData.refresh_token) {
+                context.logger.warn('No refresh token available - cannot refresh proactively');
+                return oauthData.access_token;
+            }
+            try {
+                const tokenUrl = credentials.accessTokenUrl;
+                const refreshToken = oauthData.refresh_token;
+                const clientId = credentials.clientId;
+                const clientSecret = credentials.clientSecret;
+                const apiScope = credentials.apiScope;
+                const scope = `offline_access ${apiScope}`;
+                context.logger.info('Manual refresh parameters', {
+                    tokenUrl,
+                    clientId,
+                    hasRefreshToken: !!refreshToken,
+                    apiScope,
+                    fullScope: scope
+                });
+                const response = await context.helpers.request({
+                    method: 'POST',
+                    url: tokenUrl,
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: new URLSearchParams({
+                        grant_type: 'refresh_token',
+                        refresh_token: refreshToken,
+                        client_id: clientId,
+                        client_secret: clientSecret,
+                        scope: scope,
+                    }).toString(),
+                    json: false,
+                });
+                const tokenData = JSON.parse(response);
+                if (tokenData.access_token) {
+                    context.logger.info('✅ SUCCESS: Token refreshed via manual refresh_token grant');
+                    return tokenData.access_token;
+                }
+            }
+            catch (refreshError) {
+                context.logger.error('❌ FAILED: Manual token refresh failed', {
+                    error: refreshError.message
+                });
             }
         }
         else {
@@ -317,7 +322,7 @@ class LmChatAzureOpenAiMsOAuth2 {
     }
     async supplyData(itemIndex) {
         var _a, _b;
-        this.logger.info('=== supplyData called for Azure OpenAI Chat Model (MS OAuth2) v1.3.1 ===');
+        this.logger.info('=== supplyData called for Azure OpenAI Chat Model (MS OAuth2) v1.3.2 ===');
         const deploymentName = this.getNodeParameter('deploymentName', itemIndex);
         const options = this.getNodeParameter('options', itemIndex, {});
         const getCredentialsWithFreshToken = async () => {
