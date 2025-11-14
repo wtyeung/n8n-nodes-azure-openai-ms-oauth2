@@ -21,7 +21,7 @@ export class AzureOpenAiMsOAuth2Api implements ICredentialType {
 			displayName: 'Scope',
 			name: 'scope',
 			type: 'hidden',
-			default: '={{$self.apiScope}}',
+			default: '=offline_access {{$self.apiScope}}',
 		},
 		{
 			displayName: 'API Scope',
@@ -30,7 +30,7 @@ export class AzureOpenAiMsOAuth2Api implements ICredentialType {
 			required: true,
 			default: 'api://REPLACE-WITH-YOUR-APP-ID/.default',
 			placeholder: 'api://12345678-1234-1234-1234-123456789abc/.default',
-			description: '⚠️ REQUIRED: Enter your Azure AD application scope. Format: api://<your-app-id>/.default',
+			description: '⚠️ REQUIRED: Enter your Azure AD application scope. Format: api://<your-app-id>/.default. Note: offline_access is automatically added for token refresh.',
 		},
 		{
 			displayName: 'Endpoint',
