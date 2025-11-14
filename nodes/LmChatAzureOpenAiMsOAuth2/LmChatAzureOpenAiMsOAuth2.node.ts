@@ -155,6 +155,21 @@ async function getCurrentToken(
 				
 				const tokenUrl = credentials.accessTokenUrl as string;
 				const refreshToken = oauthData.refresh_token;
+				const clientId = credentials.clientId as string;
+				const clientSecret = credentials.clientSecret as string;
+				
+				// Get the API scope from credentials (e.g., api://12345678-1234-1234-1234-123456789abc/.default)
+				const apiScope = credentials.apiScope as string;
+				// Build the full scope with offline_access
+				const scope = `offline_access ${apiScope}`;
+				
+				context.logger.info('Refresh parameters', {
+					tokenUrl,
+					clientId,
+					hasRefreshToken: !!refreshToken,
+					apiScope,
+					fullScope: scope
+				});
 				
 				const response = await context.helpers.request({
 					method: 'POST',
@@ -165,9 +180,9 @@ async function getCurrentToken(
 					body: new URLSearchParams({
 						grant_type: 'refresh_token',
 						refresh_token: refreshToken,
-						client_id: credentials.clientId as string,
-						client_secret: credentials.clientSecret as string,
-						scope: credentials.scope as string || 'openid profile email',
+						client_id: clientId,
+						client_secret: clientSecret,
+						scope: scope,
 					}).toString(),
 					json: false,
 				});
@@ -183,7 +198,8 @@ async function getCurrentToken(
 			} catch (error: any) {
 				context.logger.error('Manual token refresh failed', { 
 					error: error.message,
-					statusCode: error.statusCode
+					statusCode: error.statusCode,
+					response: error.response
 				});
 				// Continue with existing token - it might still work for a few more minutes
 			}
@@ -352,7 +368,7 @@ export class LmChatAzureOpenAiMsOAuth2 implements INodeType {
 	};
 
 	async supplyData(this: ISupplyDataFunctions, itemIndex: number): Promise<SupplyData> {
-		this.logger.info('=== supplyData called for Azure OpenAI Chat Model (MS OAuth2) v1.2.4 ===');
+		this.logger.info('=== supplyData called for Azure OpenAI Chat Model (MS OAuth2) v1.2.5 ===');
 		
 		const deploymentName = this.getNodeParameter('deploymentName', itemIndex) as string;
 		const options = this.getNodeParameter('options', itemIndex, {}) as {

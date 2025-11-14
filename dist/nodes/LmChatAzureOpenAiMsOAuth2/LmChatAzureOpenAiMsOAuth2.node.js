@@ -86,6 +86,17 @@ async function getCurrentToken(context, deploymentName) {
                 context.logger.info('Manually refreshing token using refresh_token...');
                 const tokenUrl = credentials.accessTokenUrl;
                 const refreshToken = oauthData.refresh_token;
+                const clientId = credentials.clientId;
+                const clientSecret = credentials.clientSecret;
+                const apiScope = credentials.apiScope;
+                const scope = `offline_access ${apiScope}`;
+                context.logger.info('Refresh parameters', {
+                    tokenUrl,
+                    clientId,
+                    hasRefreshToken: !!refreshToken,
+                    apiScope,
+                    fullScope: scope
+                });
                 const response = await context.helpers.request({
                     method: 'POST',
                     url: tokenUrl,
@@ -95,9 +106,9 @@ async function getCurrentToken(context, deploymentName) {
                     body: new URLSearchParams({
                         grant_type: 'refresh_token',
                         refresh_token: refreshToken,
-                        client_id: credentials.clientId,
-                        client_secret: credentials.clientSecret,
-                        scope: credentials.scope || 'openid profile email',
+                        client_id: clientId,
+                        client_secret: clientSecret,
+                        scope: scope,
                     }).toString(),
                     json: false,
                 });
@@ -110,7 +121,8 @@ async function getCurrentToken(context, deploymentName) {
             catch (error) {
                 context.logger.error('Manual token refresh failed', {
                     error: error.message,
-                    statusCode: error.statusCode
+                    statusCode: error.statusCode,
+                    response: error.response
                 });
             }
         }
@@ -272,7 +284,7 @@ class LmChatAzureOpenAiMsOAuth2 {
     }
     async supplyData(itemIndex) {
         var _a, _b;
-        this.logger.info('=== supplyData called for Azure OpenAI Chat Model (MS OAuth2) v1.2.4 ===');
+        this.logger.info('=== supplyData called for Azure OpenAI Chat Model (MS OAuth2) v1.2.5 ===');
         const deploymentName = this.getNodeParameter('deploymentName', itemIndex);
         const options = this.getNodeParameter('options', itemIndex, {});
         const context = this;
