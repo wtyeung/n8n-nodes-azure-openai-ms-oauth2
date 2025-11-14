@@ -19,7 +19,7 @@ async function getCurrentToken(context, deploymentName) {
         throw new n8n_workflow_1.NodeOperationError(context.getNode(), 'OAuth2 access token not found. Please reconnect your credentials.');
     }
     let expiryTime = oauthData.expires_at || oauthData.exp;
-    const FORCE_REFRESH_FOR_TESTING = true;
+    const FORCE_REFRESH_FOR_TESTING = false;
     if (FORCE_REFRESH_FOR_TESTING) {
         context.logger.info('TEST MODE: Forcing token refresh to test mechanism...');
         context.logger.info('TEST MODE: Making test request to trigger OAuth2 refresh...');
@@ -256,7 +256,7 @@ class LmChatAzureOpenAiMsOAuth2 {
     }
     async supplyData(itemIndex) {
         var _a, _b;
-        this.logger.info('=== supplyData called for Azure OpenAI Chat Model (MS OAuth2) v1.1.7 [TEST MODE] ===');
+        this.logger.info('=== supplyData called for Azure OpenAI Chat Model (MS OAuth2) v1.2.0 ===');
         const deploymentName = this.getNodeParameter('deploymentName', itemIndex);
         const options = this.getNodeParameter('options', itemIndex, {});
         const context = this;
@@ -291,8 +291,12 @@ class LmChatAzureOpenAiMsOAuth2 {
                 }
                 : undefined,
         });
+        const modelMethods = Object.getOwnPropertyNames(Object.getPrototypeOf(model)).filter(m => typeof model[m] === 'function');
+        context.logger.info('Model methods available:', { methods: modelMethods });
         const originalInvoke = model.invoke.bind(model);
         const originalStream = model.stream.bind(model);
+        const originalCall = model.call ? model.call.bind(model) : null;
+        const originalGenerate = model.generate ? model.generate.bind(model) : null;
         model.invoke = async function (input, options) {
             var _a;
             context.logger.info('=== Model invoke() called - fetching fresh credentials ===');
@@ -314,6 +318,7 @@ class LmChatAzureOpenAiMsOAuth2 {
         };
         model.stream = async function (input, options) {
             var _a;
+            context.logger.info('=== Model stream() called - fetching fresh credentials ===');
             const freshCreds = await getCredentialsWithFreshToken();
             this.azureOpenAIApiKey = freshCreds.accessToken;
             try {
@@ -329,6 +334,22 @@ class LmChatAzureOpenAiMsOAuth2 {
                 throw error;
             }
         };
+        if (originalCall) {
+            model.call = async function (...args) {
+                context.logger.info('=== Model call() called - fetching fresh credentials ===');
+                const freshCreds = await getCredentialsWithFreshToken();
+                this.azureOpenAIApiKey = freshCreds.accessToken;
+                return await originalCall(...args);
+            };
+        }
+        if (originalGenerate) {
+            model.generate = async function (...args) {
+                context.logger.info('=== Model generate() called - fetching fresh credentials ===');
+                const freshCreds = await getCredentialsWithFreshToken();
+                this.azureOpenAIApiKey = freshCreds.accessToken;
+                return await originalGenerate(...args);
+            };
+        }
         return {
             response: model,
         };

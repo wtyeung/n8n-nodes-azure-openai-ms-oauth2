@@ -52,7 +52,7 @@ async function getCurrentToken(
 	
 	// TEST MODE: Force refresh on every call to test the mechanism
 	// Set to true to test token refresh without waiting for expiry
-	const FORCE_REFRESH_FOR_TESTING = true;
+	const FORCE_REFRESH_FOR_TESTING = false;
 	
 	if (FORCE_REFRESH_FOR_TESTING) {
 		context.logger.info('TEST MODE: Forcing token refresh to test mechanism...');
@@ -325,7 +325,7 @@ export class LmChatAzureOpenAiMsOAuth2 implements INodeType {
 	};
 
 	async supplyData(this: ISupplyDataFunctions, itemIndex: number): Promise<SupplyData> {
-		this.logger.info('=== supplyData called for Azure OpenAI Chat Model (MS OAuth2) v1.1.7 [TEST MODE] ===');
+		this.logger.info('=== supplyData called for Azure OpenAI Chat Model (MS OAuth2) v1.2.0 ===');
 		
 		const deploymentName = this.getNodeParameter('deploymentName', itemIndex) as string;
 		const options = this.getNodeParameter('options', itemIndex, {}) as {
@@ -388,9 +388,16 @@ export class LmChatAzureOpenAiMsOAuth2 implements INodeType {
 				: undefined,
 		});
 
-		// Wrap the model to refresh token before each call and handle 401 errors
+		// Log available methods on the model
+		const modelMethods = Object.getOwnPropertyNames(Object.getPrototypeOf(model)).filter(m => typeof (model as any)[m] === 'function');
+		context.logger.info('Model methods available:', { methods: modelMethods });
+		
+		// Wrap ALL async methods to ensure token refresh
+		// The AI Agent might call methods other than invoke/stream
 		const originalInvoke = model.invoke.bind(model);
 		const originalStream = model.stream.bind(model);
+		const originalCall = (model as any).call ? (model as any).call.bind(model) : null;
+		const originalGenerate = (model as any).generate ? (model as any).generate.bind(model) : null;
 		
 		model.invoke = async function(input: any, options?: any) {
 			context.logger.info('=== Model invoke() called - fetching fresh credentials ===');
@@ -415,6 +422,7 @@ export class LmChatAzureOpenAiMsOAuth2 implements INodeType {
 		};
 		
 		model.stream = async function(input: any, options?: any) {
+			context.logger.info('=== Model stream() called - fetching fresh credentials ===');
 			// Get fresh token before stream
 			const freshCreds = await getCredentialsWithFreshToken();
 			(this as any).azureOpenAIApiKey = freshCreds.accessToken;
@@ -432,6 +440,26 @@ export class LmChatAzureOpenAiMsOAuth2 implements INodeType {
 				throw error;
 			}
 		};
+		
+		// Wrap call() if it exists
+		if (originalCall) {
+			(model as any).call = async function(...args: any[]) {
+				context.logger.info('=== Model call() called - fetching fresh credentials ===');
+				const freshCreds = await getCredentialsWithFreshToken();
+				(this as any).azureOpenAIApiKey = freshCreds.accessToken;
+				return await originalCall(...args);
+			};
+		}
+		
+		// Wrap generate() if it exists
+		if (originalGenerate) {
+			(model as any).generate = async function(...args: any[]) {
+				context.logger.info('=== Model generate() called - fetching fresh credentials ===');
+				const freshCreds = await getCredentialsWithFreshToken();
+				(this as any).azureOpenAIApiKey = freshCreds.accessToken;
+				return await originalGenerate(...args);
+			};
+		}
 
 		return {
 			response: model,
