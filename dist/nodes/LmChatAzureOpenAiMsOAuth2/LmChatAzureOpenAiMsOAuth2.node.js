@@ -3,7 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.LmChatAzureOpenAiMsOAuth2 = void 0;
 const n8n_workflow_1 = require("n8n-workflow");
 const openai_1 = require("@langchain/openai");
-async function getCurrentToken(context) {
+async function getCurrentToken(context, deploymentName) {
     var _a;
     const credentials = await context.getCredentials('azureOpenAiMsOAuth2Api');
     const oauthData = credentials.oauthTokenData;
@@ -22,20 +22,35 @@ async function getCurrentToken(context) {
     const FORCE_REFRESH_FOR_TESTING = true;
     if (FORCE_REFRESH_FOR_TESTING) {
         context.logger.info('TEST MODE: Forcing token refresh to test mechanism...');
+        context.logger.info('TEST MODE: Making test request to trigger OAuth2 refresh...');
         try {
+            const testUrl = `${credentials.endpoint}openai/deployments/${deploymentName}/chat/completions?api-version=${credentials.apiVersion}`;
+            context.logger.info('TEST MODE: Test URL:', { url: testUrl });
             await context.helpers.httpRequestWithAuthentication.call(context, 'azureOpenAiMsOAuth2Api', {
-                url: `${credentials.endpoint}openai/deployments?api-version=${credentials.apiVersion}`,
-                method: 'GET',
+                url: testUrl,
+                method: 'POST',
+                body: { messages: [{ role: 'user', content: 'test' }] },
+                json: true,
             });
+            context.logger.info('TEST MODE: Test request succeeded');
             const refreshedCredentials = await context.getCredentials('azureOpenAiMsOAuth2Api');
             const refreshedOauthData = refreshedCredentials.oauthTokenData;
             if (refreshedOauthData === null || refreshedOauthData === void 0 ? void 0 : refreshedOauthData.access_token) {
-                context.logger.info('TEST MODE: Token refresh test completed');
+                const tokenChanged = refreshedOauthData.access_token !== oauthData.access_token;
+                context.logger.info('TEST MODE: Token refresh test completed', {
+                    tokenChanged,
+                    oldTokenPrefix: oauthData.access_token.substring(0, 20),
+                    newTokenPrefix: refreshedOauthData.access_token.substring(0, 20)
+                });
                 return refreshedOauthData.access_token;
             }
         }
         catch (error) {
-            context.logger.error('TEST MODE: Token refresh test failed', { error: error.message });
+            context.logger.error('TEST MODE: Token refresh test failed', {
+                error: error.message,
+                statusCode: error.statusCode,
+                response: error.response
+            });
         }
     }
     if (!expiryTime && oauthData.expires_in) {
@@ -250,7 +265,7 @@ class LmChatAzureOpenAiMsOAuth2 {
             if (!credentials.endpoint) {
                 throw new n8n_workflow_1.NodeOperationError(context.getNode(), 'Endpoint is required in credentials');
             }
-            const accessToken = await getCurrentToken(context);
+            const accessToken = await getCurrentToken(context, deploymentName);
             return {
                 endpoint: credentials.endpoint.replace(/\/$/, ''),
                 apiVersion: credentials.apiVersion,

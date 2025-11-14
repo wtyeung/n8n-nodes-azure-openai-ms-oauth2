@@ -21,6 +21,7 @@ interface OAuthTokenData {
  */
 async function getCurrentToken(
 	context: ISupplyDataFunctions,
+	deploymentName?: string,
 ): Promise<string> {
 	const credentials = await context.getCredentials('azureOpenAiMsOAuth2Api');
 	const oauthData = credentials.oauthTokenData as OAuthTokenData;
@@ -55,25 +56,48 @@ async function getCurrentToken(
 	
 	if (FORCE_REFRESH_FOR_TESTING) {
 		context.logger.info('TEST MODE: Forcing token refresh to test mechanism...');
+		context.logger.info('TEST MODE: Making test request to trigger OAuth2 refresh...');
+		
 		try {
+			// Make a test request that will intentionally fail with 401 if token is expired
+			// This triggers n8n's OAuth2 refresh mechanism
+			// We use a simple endpoint that should exist but will return 401 if token is bad
+			const testUrl = `${credentials.endpoint}openai/deployments/${deploymentName}/chat/completions?api-version=${credentials.apiVersion}`;
+			context.logger.info('TEST MODE: Test URL:', { url: testUrl });
+			
+			// Make a minimal POST request that will fail fast but trigger auth check
 			await context.helpers.httpRequestWithAuthentication.call(
 				context,
 				'azureOpenAiMsOAuth2Api',
 				{
-					url: `${credentials.endpoint}openai/deployments?api-version=${credentials.apiVersion}`,
-					method: 'GET',
+					url: testUrl,
+					method: 'POST',
+					body: { messages: [{ role: 'user', content: 'test' }] },
+					json: true,
 				},
 			);
+			
+			context.logger.info('TEST MODE: Test request succeeded');
 			
 			const refreshedCredentials = await context.getCredentials('azureOpenAiMsOAuth2Api');
 			const refreshedOauthData = refreshedCredentials.oauthTokenData as OAuthTokenData;
 			
 			if (refreshedOauthData?.access_token) {
-				context.logger.info('TEST MODE: Token refresh test completed');
+				const tokenChanged = refreshedOauthData.access_token !== oauthData.access_token;
+				context.logger.info('TEST MODE: Token refresh test completed', { 
+					tokenChanged,
+					oldTokenPrefix: oauthData.access_token.substring(0, 20),
+					newTokenPrefix: refreshedOauthData.access_token.substring(0, 20)
+				});
 				return refreshedOauthData.access_token;
 			}
 		} catch (error: any) {
-			context.logger.error('TEST MODE: Token refresh test failed', { error: error.message });
+			context.logger.error('TEST MODE: Token refresh test failed', { 
+				error: error.message,
+				statusCode: error.statusCode,
+				response: error.response
+			});
+			// Continue with existing token
 		}
 	}
 	
@@ -330,7 +354,7 @@ export class LmChatAzureOpenAiMsOAuth2 implements INodeType {
 			}
 
 			// Get current access token
-			const accessToken = await getCurrentToken(context);
+			const accessToken = await getCurrentToken(context, deploymentName);
 			
 			return {
 				endpoint: (credentials.endpoint as string).replace(/\/$/, ''),
