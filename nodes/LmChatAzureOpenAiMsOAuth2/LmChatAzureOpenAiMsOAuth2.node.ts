@@ -43,8 +43,45 @@ async function getCurrentToken(
 	}
 
 	// Check if token is expired or about to expire (within 5 minutes)
-	// Support both expires_at (n8n format) and exp (JWT standard)
-	const expiryTime = oauthData.expires_at || oauthData.exp;
+	// Support multiple expiry formats:
+	// - expires_at: Unix timestamp (n8n format)
+	// - exp: Unix timestamp (JWT standard)
+	// - expires_in: Duration in seconds (need to calculate expiry time)
+	let expiryTime = oauthData.expires_at || oauthData.exp;
+	
+	// TEST MODE: Force refresh on every call to test the mechanism
+	// Set to true to test token refresh without waiting for expiry
+	const FORCE_REFRESH_FOR_TESTING = true;
+	
+	if (FORCE_REFRESH_FOR_TESTING) {
+		context.logger.info('TEST MODE: Forcing token refresh to test mechanism...');
+		try {
+			await context.helpers.httpRequestWithAuthentication.call(
+				context,
+				'azureOpenAiMsOAuth2Api',
+				{
+					url: `${credentials.endpoint}openai/deployments?api-version=${credentials.apiVersion}`,
+					method: 'GET',
+				},
+			);
+			
+			const refreshedCredentials = await context.getCredentials('azureOpenAiMsOAuth2Api');
+			const refreshedOauthData = refreshedCredentials.oauthTokenData as OAuthTokenData;
+			
+			if (refreshedOauthData?.access_token) {
+				context.logger.info('TEST MODE: Token refresh test completed');
+				return refreshedOauthData.access_token;
+			}
+		} catch (error: any) {
+			context.logger.error('TEST MODE: Token refresh test failed', { error: error.message });
+		}
+	}
+	
+	// If we only have expires_in, we can't determine exact expiry without knowing when token was issued
+	// In this case, we'll have to rely on 401 retry logic
+	if (!expiryTime && oauthData.expires_in) {
+		context.logger.warn(`Token only has expires_in (${oauthData.expires_in}s) without timestamp - cannot determine exact expiry. Will rely on 401 retry logic.`);
+	}
 	
 	if (expiryTime) {
 		const now = Math.floor(Date.now() / 1000);
@@ -264,7 +301,7 @@ export class LmChatAzureOpenAiMsOAuth2 implements INodeType {
 	};
 
 	async supplyData(this: ISupplyDataFunctions, itemIndex: number): Promise<SupplyData> {
-		this.logger.info('=== supplyData called for Azure OpenAI Chat Model (MS OAuth2) v1.1.5 ===');
+		this.logger.info('=== supplyData called for Azure OpenAI Chat Model (MS OAuth2) v1.1.6 [TEST MODE] ===');
 		
 		const deploymentName = this.getNodeParameter('deploymentName', itemIndex) as string;
 		const options = this.getNodeParameter('options', itemIndex, {}) as {

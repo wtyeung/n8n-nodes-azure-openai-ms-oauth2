@@ -18,7 +18,29 @@ async function getCurrentToken(context) {
     if (!(oauthData === null || oauthData === void 0 ? void 0 : oauthData.access_token)) {
         throw new n8n_workflow_1.NodeOperationError(context.getNode(), 'OAuth2 access token not found. Please reconnect your credentials.');
     }
-    const expiryTime = oauthData.expires_at || oauthData.exp;
+    let expiryTime = oauthData.expires_at || oauthData.exp;
+    const FORCE_REFRESH_FOR_TESTING = true;
+    if (FORCE_REFRESH_FOR_TESTING) {
+        context.logger.info('TEST MODE: Forcing token refresh to test mechanism...');
+        try {
+            await context.helpers.httpRequestWithAuthentication.call(context, 'azureOpenAiMsOAuth2Api', {
+                url: `${credentials.endpoint}openai/deployments?api-version=${credentials.apiVersion}`,
+                method: 'GET',
+            });
+            const refreshedCredentials = await context.getCredentials('azureOpenAiMsOAuth2Api');
+            const refreshedOauthData = refreshedCredentials.oauthTokenData;
+            if (refreshedOauthData === null || refreshedOauthData === void 0 ? void 0 : refreshedOauthData.access_token) {
+                context.logger.info('TEST MODE: Token refresh test completed');
+                return refreshedOauthData.access_token;
+            }
+        }
+        catch (error) {
+            context.logger.error('TEST MODE: Token refresh test failed', { error: error.message });
+        }
+    }
+    if (!expiryTime && oauthData.expires_in) {
+        context.logger.warn(`Token only has expires_in (${oauthData.expires_in}s) without timestamp - cannot determine exact expiry. Will rely on 401 retry logic.`);
+    }
     if (expiryTime) {
         const now = Math.floor(Date.now() / 1000);
         const expiresAt = expiryTime;
@@ -219,7 +241,7 @@ class LmChatAzureOpenAiMsOAuth2 {
     }
     async supplyData(itemIndex) {
         var _a, _b;
-        this.logger.info('=== supplyData called for Azure OpenAI Chat Model (MS OAuth2) v1.1.5 ===');
+        this.logger.info('=== supplyData called for Azure OpenAI Chat Model (MS OAuth2) v1.1.6 [TEST MODE] ===');
         const deploymentName = this.getNodeParameter('deploymentName', itemIndex);
         const options = this.getNodeParameter('options', itemIndex, {});
         const context = this;
