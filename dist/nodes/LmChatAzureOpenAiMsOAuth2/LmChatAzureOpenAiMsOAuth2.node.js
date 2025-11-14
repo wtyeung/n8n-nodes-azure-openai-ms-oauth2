@@ -7,6 +7,11 @@ async function getCurrentToken(context) {
     var _a;
     const credentials = await context.getCredentials('azureOpenAiMsOAuth2Api');
     const oauthData = credentials.oauthTokenData;
+    context.logger.info('Getting current token', {
+        hasToken: !!(oauthData === null || oauthData === void 0 ? void 0 : oauthData.access_token),
+        hasExpiresAt: !!(oauthData === null || oauthData === void 0 ? void 0 : oauthData.expires_at),
+        expiresAt: (oauthData === null || oauthData === void 0 ? void 0 : oauthData.expires_at) ? new Date(oauthData.expires_at * 1000).toISOString() : 'not set'
+    });
     if (!(oauthData === null || oauthData === void 0 ? void 0 : oauthData.access_token)) {
         throw new n8n_workflow_1.NodeOperationError(context.getNode(), 'OAuth2 access token not found. Please reconnect your credentials.');
     }
@@ -52,6 +57,12 @@ async function getCurrentToken(context) {
                 }
             }
         }
+        else {
+            context.logger.info(`Token still valid, expires in ${Math.floor((expiresAt - now) / 60)} minutes`);
+        }
+    }
+    else {
+        context.logger.warn('Token does not have expires_at - cannot proactively refresh. Will rely on 401 retry logic.');
     }
     return oauthData.access_token;
 }

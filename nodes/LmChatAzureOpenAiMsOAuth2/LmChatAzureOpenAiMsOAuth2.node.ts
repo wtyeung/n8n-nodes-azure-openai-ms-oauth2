@@ -24,6 +24,12 @@ async function getCurrentToken(
 	const credentials = await context.getCredentials('azureOpenAiMsOAuth2Api');
 	const oauthData = credentials.oauthTokenData as OAuthTokenData;
 	
+	context.logger.info('Getting current token', { 
+		hasToken: !!oauthData?.access_token,
+		hasExpiresAt: !!oauthData?.expires_at,
+		expiresAt: oauthData?.expires_at ? new Date(oauthData.expires_at * 1000).toISOString() : 'not set'
+	});
+	
 	if (!oauthData?.access_token) {
 		throw new NodeOperationError(
 			context.getNode(),
@@ -85,7 +91,11 @@ async function getCurrentToken(
 					context.logger.error('Failed to fetch credentials after error', { error: e });
 				}
 			}
+		} else {
+			context.logger.info(`Token still valid, expires in ${Math.floor((expiresAt - now) / 60)} minutes`);
 		}
+	} else {
+		context.logger.warn('Token does not have expires_at - cannot proactively refresh. Will rely on 401 retry logic.');
 	}
 
 	return oauthData.access_token;
