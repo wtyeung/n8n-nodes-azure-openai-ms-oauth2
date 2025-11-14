@@ -38,11 +38,11 @@ async function getCurrentToken(
 		const bufferTime = 300; // 5 minutes
 
 		if (now >= expiresAt - bufferTime) {
-			context.logger.info('Token expired or expiring soon, triggering refresh via test request...');
+			context.logger.info(`Token expired or expiring soon (expires at ${new Date(expiresAt * 1000).toISOString()}), triggering refresh via test request...`);
 			
 			try {
 				// Make a test request using n8n's HTTP helper to trigger OAuth2 refresh
-				// This will cause n8n to refresh the token if it gets a 401 error
+				// httpRequestWithAuthentication will automatically refresh the token on 401
 				await context.helpers.httpRequestWithAuthentication.call(
 					context,
 					'azureOpenAiMsOAuth2Api',
@@ -52,18 +52,38 @@ async function getCurrentToken(
 					},
 				);
 				
+				context.logger.info('Test request succeeded, fetching refreshed credentials...');
+				
 				// Re-fetch credentials after the test request (token should be refreshed now)
 				const refreshedCredentials = await context.getCredentials('azureOpenAiMsOAuth2Api');
 				const refreshedOauthData = refreshedCredentials.oauthTokenData as OAuthTokenData;
 				
-				if (refreshedOauthData?.access_token) {
-					context.logger.info('Token refreshed successfully');
+				if (refreshedOauthData?.access_token && refreshedOauthData.access_token !== oauthData.access_token) {
+					context.logger.info('Token refreshed successfully - new token received');
+					return refreshedOauthData.access_token;
+				} else if (refreshedOauthData?.access_token) {
+					context.logger.info('Token still valid after test request');
 					return refreshedOauthData.access_token;
 				}
-			} catch (error) {
-				// If test request fails, log but continue with existing token
-				// The actual API call will fail and provide better error message
-				context.logger.warn('Token refresh test request failed, continuing with existing token', { error });
+			} catch (error: any) {
+				// Log detailed error information
+				context.logger.error('Token refresh test request failed', { 
+					error: error.message,
+					status: error.statusCode || error.status,
+					response: error.response?.body || error.response
+				});
+				
+				// Try to fetch credentials anyway - n8n might have refreshed despite error
+				try {
+					const refreshedCredentials = await context.getCredentials('azureOpenAiMsOAuth2Api');
+					const refreshedOauthData = refreshedCredentials.oauthTokenData as OAuthTokenData;
+					if (refreshedOauthData?.access_token && refreshedOauthData.access_token !== oauthData.access_token) {
+						context.logger.info('Token was refreshed despite error');
+						return refreshedOauthData.access_token;
+					}
+				} catch (e) {
+					context.logger.error('Failed to fetch credentials after error', { error: e });
+				}
 			}
 		}
 	}
