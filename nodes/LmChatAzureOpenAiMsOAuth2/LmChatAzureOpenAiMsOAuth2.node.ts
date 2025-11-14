@@ -19,6 +19,7 @@ interface OAuthTokenData {
  * Decode JWT token to extract claims (without validation)
  * Returns the payload as a JSON object
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function decodeJWT(token: string): any {
 	try {
 		// JWT format: header.payload.signature
@@ -34,7 +35,7 @@ function decodeJWT(token: string): any {
 		// Decode base64
 		const jsonPayload = Buffer.from(base64, 'base64').toString('utf8');
 		return JSON.parse(jsonPayload);
-	} catch (error) {
+	} catch {
 		return null;
 	}
 }
@@ -73,7 +74,7 @@ async function getCurrentToken(
 
 	// Check if token is expired or about to expire (within 5 minutes)
 	// Priority: JWT exp claim > expires_at > exp from oauthData
-	let expiryTime = tokenExp || oauthData.expires_at || oauthData.exp;
+	const expiryTime = tokenExp || oauthData.expires_at || oauthData.exp;
 	
 	// TEST MODE: Force refresh on every call to test the mechanism
 	// Set to true to test token refresh without waiting for expiry
@@ -137,6 +138,7 @@ async function getCurrentToken(
 		
 		// Get buffer time from environment variable or use default (15 minutes)
 		// Valid range: 60 seconds (1 minute) to 3600 seconds (60 minutes)
+		// eslint-disable-next-line @n8n/community-nodes/no-restricted-globals
 		const envBufferTime = process.env.AZURE_OPENAI_TOKEN_REFRESH_BUFFER_SECONDS;
 		let bufferTime = 900; // Default: 15 minutes
 		
@@ -153,71 +155,105 @@ async function getCurrentToken(
 		if (now >= expiresAt - bufferTime) {
 			context.logger.info(`Token expired or expiring soon (expires at ${new Date(expiresAt * 1000).toISOString()}), triggering refresh...`);
 			
-			// Since the token is still valid (not yet expired), making a test request won't return 401
-			// and won't trigger n8n's OAuth2 refresh automatically.
-			// We need to manually refresh using the refresh token.
-			
-			if (!oauthData.refresh_token) {
-				context.logger.warn('No refresh token available - cannot refresh proactively');
-				return oauthData.access_token;
-			}
+			// Strategy: Try HTTP request first (triggers n8n's OAuth2 refresh on 401)
+			// If that fails, fallback to manual refresh token grant
 			
 			try {
-				// Manually refresh the token using Azure AD token endpoint
-				context.logger.info('Manually refreshing token using refresh_token...');
+				// Try to trigger n8n's OAuth2 refresh by making a test request
+				// This works if the token is actually expired (401 response)
+				context.logger.info('🔄 REFRESH METHOD 1: Attempting refresh via test HTTP request...');
 				
-				const tokenUrl = credentials.accessTokenUrl as string;
-				const refreshToken = oauthData.refresh_token;
-				const clientId = credentials.clientId as string;
-				const clientSecret = credentials.clientSecret as string;
+				// Use the chat completions endpoint with a minimal POST request
+				const testUrl = `${credentials.endpoint}openai/deployments/${deploymentName}/chat/completions?api-version=${credentials.apiVersion}`;
 				
-				// Get the API scope from credentials (e.g., api://12345678-1234-1234-1234-123456789abc/.default)
-				const apiScope = credentials.apiScope as string;
-				// Build the full scope with offline_access
-				const scope = `offline_access ${apiScope}`;
-				
-				context.logger.info('Refresh parameters', {
-					tokenUrl,
-					clientId,
-					hasRefreshToken: !!refreshToken,
-					apiScope,
-					fullScope: scope
-				});
-				
-				const response = await context.helpers.request({
-					method: 'POST',
-					url: tokenUrl,
-					headers: {
-						'Content-Type': 'application/x-www-form-urlencoded',
+				await context.helpers.httpRequestWithAuthentication.call(
+					context,
+					'azureOpenAiMsOAuth2Api',
+					{
+						url: testUrl,
+						method: 'POST',
+						body: {
+							messages: [{ role: 'user', content: 'test' }],
+							max_tokens: 1,
+						},
+						json: true,
 					},
-					body: new URLSearchParams({
-						grant_type: 'refresh_token',
-						refresh_token: refreshToken,
-						client_id: clientId,
-						client_secret: clientSecret,
-						scope: scope,
-					}).toString(),
-					json: false,
-				});
+				);
 				
-				const tokenData = JSON.parse(response as string);
+				context.logger.info('Test request succeeded, fetching refreshed credentials...');
 				
-				if (tokenData.access_token) {
-					context.logger.info('Token refreshed successfully via manual refresh');
-					// Note: We can't update the stored credentials from here
-					// But we can return the new token for this execution
-					return tokenData.access_token;
+				// Re-fetch credentials after potential refresh
+				const refreshedCredentials = await context.getCredentials('azureOpenAiMsOAuth2Api');
+				const refreshedOauthData = refreshedCredentials.oauthTokenData as OAuthTokenData;
+				
+				if (refreshedOauthData?.access_token && refreshedOauthData.access_token !== oauthData.access_token) {
+					context.logger.info('✅ SUCCESS: Token was refreshed via HTTP request (Method 1)');
+					return refreshedOauthData.access_token;
 				}
-			} catch (error: any) {
-				context.logger.error('Manual token refresh failed', { 
-					error: error.message,
-					statusCode: error.statusCode,
-					response: error.response
-				});
-				// Continue with existing token - it might still work for a few more minutes
+				
+				context.logger.info('ℹ️ Token unchanged after test request, will use existing token');
+				return oauthData.access_token;
+				
+			} catch {
+				// HTTP request failed - try manual refresh as fallback
+				context.logger.info('❌ Method 1 failed, trying Method 2...');
+				context.logger.info('🔄 REFRESH METHOD 2: Manual refresh token grant...');
+				
+				if (!oauthData.refresh_token) {
+					context.logger.warn('No refresh token available - cannot refresh proactively');
+					return oauthData.access_token;
+				}
+				
+				try {
+					// Manually refresh the token using Azure AD token endpoint
+					const tokenUrl = credentials.accessTokenUrl as string;
+					const refreshToken = oauthData.refresh_token;
+					const clientId = credentials.clientId as string;
+					const clientSecret = credentials.clientSecret as string;
+					
+					// Get the API scope from credentials
+					const apiScope = credentials.apiScope as string;
+					const scope = `offline_access ${apiScope}`;
+					
+					context.logger.info('Manual refresh parameters', {
+						tokenUrl,
+						clientId,
+						hasRefreshToken: !!refreshToken,
+						apiScope,
+						fullScope: scope
+					});
+					
+					const response = await context.helpers.request({
+						method: 'POST',
+						url: tokenUrl,
+						headers: {
+							'Content-Type': 'application/x-www-form-urlencoded',
+						},
+						body: new URLSearchParams({
+							grant_type: 'refresh_token',
+							refresh_token: refreshToken,
+							client_id: clientId,
+							client_secret: clientSecret,
+							scope: scope,
+						}).toString(),
+						json: false,
+					});
+					
+					const tokenData = JSON.parse(response as string);
+					
+					if (tokenData.access_token) {
+						context.logger.info('✅ SUCCESS: Token refreshed successfully via manual refresh (Method 2)');
+						return tokenData.access_token;
+					}
+				} catch (refreshError) {
+					context.logger.error('❌ FAILED: Both refresh methods failed', { 
+						error: (refreshError as Error).message
+					});
+					// Continue with existing token - it might still work for a few more minutes
+				}
 			}
 		} else {
-			context.logger.info(`Token still valid, expires in ${Math.floor((expiresAt - now) / 60)} minutes`);
+			context.logger.info(`✓ Token still valid, expires in ${Math.floor((expiresAt - now) / 60)} minutes`);
 		}
 	} else {
 		context.logger.warn('Token does not have expires_at or exp field - cannot proactively refresh. Will rely on 401 retry logic.');
@@ -381,7 +417,7 @@ export class LmChatAzureOpenAiMsOAuth2 implements INodeType {
 	};
 
 	async supplyData(this: ISupplyDataFunctions, itemIndex: number): Promise<SupplyData> {
-		this.logger.info('=== supplyData called for Azure OpenAI Chat Model (MS OAuth2) v1.3.0 ===');
+		this.logger.info('=== supplyData called for Azure OpenAI Chat Model (MS OAuth2) v1.3.1 ===');
 		
 		const deploymentName = this.getNodeParameter('deploymentName', itemIndex) as string;
 		const options = this.getNodeParameter('options', itemIndex, {}) as {
@@ -395,22 +431,19 @@ export class LmChatAzureOpenAiMsOAuth2 implements INodeType {
 			responseFormat?: string;
 		};
 
-		// Store context reference for token refresh
-		const context = this;
-		
-		// Create a wrapper that provides fresh credentials on each call
+		// Get fresh credentials with proactive token refresh
 		const getCredentialsWithFreshToken = async () => {
-			const credentials = await context.getCredentials('azureOpenAiMsOAuth2Api');
+			const credentials = await this.getCredentials('azureOpenAiMsOAuth2Api');
 			
 			if (!credentials.endpoint) {
 				throw new NodeOperationError(
-					context.getNode(),
+					this.getNode(),
 					'Endpoint is required in credentials',
 				);
 			}
 
-			// Get current access token
-			const accessToken = await getCurrentToken(context, deploymentName);
+			// Get current access token (with proactive refresh if needed)
+			const accessToken = await getCurrentToken(this, deploymentName);
 			
 			return {
 				endpoint: (credentials.endpoint as string).replace(/\/$/, ''),
@@ -419,15 +452,15 @@ export class LmChatAzureOpenAiMsOAuth2 implements INodeType {
 			};
 		};
 
-		// Get initial credentials
+		// Get initial credentials with fresh token
 		const initialCreds = await getCredentialsWithFreshToken();
 
-		// Create model with configuration that will be used
-		// Note: We need to recreate the model on each invocation to get fresh tokens
-		// This is a workaround for LangChain not supporting dynamic token refresh
+		// Create model with fresh token
+		// Token refresh happens in getCurrentToken() which is called by getCredentialsWithFreshToken()
+		// The token is checked for expiry and refreshed proactively before model initialization
 		const model = new AzureChatOpenAI({
 			azureOpenAIApiDeploymentName: deploymentName,
-			azureOpenAIApiKey: initialCreds.accessToken, // JWT token passed as api-key for APIM to validate
+			azureOpenAIApiKey: initialCreds.accessToken, // Fresh JWT token passed as api-key for APIM to validate
 			azureOpenAIEndpoint: initialCreds.endpoint,
 			azureOpenAIApiVersion: initialCreds.apiVersion,
 			maxTokens: options.maxTokens !== -1 ? options.maxTokens : undefined,
@@ -443,92 +476,6 @@ export class LmChatAzureOpenAiMsOAuth2 implements INodeType {
 					}
 				: undefined,
 		});
-
-		// Log available methods on the model instance and its prototype chain
-		const instanceMethods = Object.getOwnPropertyNames(model).filter(m => typeof (model as any)[m] === 'function');
-		const prototypeMethods = Object.getOwnPropertyNames(Object.getPrototypeOf(model)).filter(m => typeof (model as any)[m] === 'function');
-		context.logger.info('Model methods:', { 
-			instance: instanceMethods,
-			prototype: prototypeMethods,
-			hasInvoke: typeof model.invoke === 'function',
-			hasStream: typeof model.stream === 'function',
-			hasCall: typeof (model as any).call === 'function',
-			hasGenerate: typeof (model as any).generate === 'function'
-		});
-		
-		// Wrap ALL async methods to ensure token refresh
-		// Check if methods exist before wrapping
-		const originalInvoke = typeof model.invoke === 'function' ? model.invoke.bind(model) : null;
-		const originalStream = typeof model.stream === 'function' ? model.stream.bind(model) : null;
-		const originalCall = typeof (model as any).call === 'function' ? (model as any).call.bind(model) : null;
-		const originalGenerate = typeof (model as any).generate === 'function' ? (model as any).generate.bind(model) : null;
-		
-		// Only wrap methods that exist
-		if (originalInvoke) {
-			model.invoke = async function(input: any, options?: any) {
-				context.logger.info('=== Model invoke() called - fetching fresh credentials ===');
-				// Get fresh token before invoke
-				const freshCreds = await getCredentialsWithFreshToken();
-				(this as any).azureOpenAIApiKey = freshCreds.accessToken;
-				context.logger.info('Token injected into model, calling original invoke');
-				
-				try {
-					return await originalInvoke(input, options);
-				} catch (error: any) {
-					// If we get a 401 error, the token might have expired between fetch and use
-					// Retry once with a fresh token
-					if (error?.status === 401 || error?.response?.status === 401) {
-						context.logger.info('Received 401 error, retrying with fresh token...');
-						const retryCreds = await getCredentialsWithFreshToken();
-						(this as any).azureOpenAIApiKey = retryCreds.accessToken;
-						return await originalInvoke(input, options);
-					}
-					throw error;
-				}
-			};
-		}
-		
-		if (originalStream) {
-			model.stream = async function(input: any, options?: any) {
-				context.logger.info('=== Model stream() called - fetching fresh credentials ===');
-				// Get fresh token before stream
-				const freshCreds = await getCredentialsWithFreshToken();
-				(this as any).azureOpenAIApiKey = freshCreds.accessToken;
-				
-				try {
-					return await originalStream(input, options);
-				} catch (error: any) {
-					// If we get a 401 error, retry with fresh token
-					if (error?.status === 401 || error?.response?.status === 401) {
-						context.logger.info('Received 401 error, retrying with fresh token...');
-						const retryCreds = await getCredentialsWithFreshToken();
-						(this as any).azureOpenAIApiKey = retryCreds.accessToken;
-						return await originalStream(input, options);
-					}
-					throw error;
-				}
-			};
-		}
-		
-		// Wrap call() if it exists
-		if (originalCall) {
-			(model as any).call = async function(...args: any[]) {
-				context.logger.info('=== Model call() called - fetching fresh credentials ===');
-				const freshCreds = await getCredentialsWithFreshToken();
-				(this as any).azureOpenAIApiKey = freshCreds.accessToken;
-				return await originalCall(...args);
-			};
-		}
-		
-		// Wrap generate() if it exists
-		if (originalGenerate) {
-			(model as any).generate = async function(...args: any[]) {
-				context.logger.info('=== Model generate() called - fetching fresh credentials ===');
-				const freshCreds = await getCredentialsWithFreshToken();
-				(this as any).azureOpenAIApiKey = freshCreds.accessToken;
-				return await originalGenerate(...args);
-			};
-		}
 
 		return {
 			response: model,
