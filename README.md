@@ -39,11 +39,12 @@ Or install directly in n8n:
 - **LangChain Chains**: Compatible with all LangChain chain types
 - **Streaming Support**: Real-time response streaming
 - **Model Parameters**: Full control over temperature, max tokens, penalties, etc.
-- **OAuth2 Security**: Enterprise-grade authentication with proactive token refresh
+- **OAuth2 Security**: Enterprise-grade authentication with smart token refresh
   - Automatically decodes JWT to check token expiry before each request
-  - Refreshes tokens 15 minutes before expiration (configurable)
-  - Prevents authentication failures from expired tokens
-  - Configurable refresh buffer via environment variable
+  - Proactive token refresh before expiration (default: 15 minutes before)
+  - Prevents authentication failures from expired tokens during workflow execution
+  - Configurable refresh buffer in credential settings (60-3600 seconds)
+  - Smart strategy: Uses HTTP request for expired tokens, manual refresh for expiring tokens
 
 ### Azure API Management (APIM) AI Gateway Support
 This node is specifically designed for APIM AI Gateway scenarios where:
