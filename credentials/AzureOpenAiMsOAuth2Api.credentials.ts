@@ -49,6 +49,15 @@ export class AzureOpenAiMsOAuth2Api implements ICredentialType {
 			default: '2025-03-01-preview',
 			description: 'The API version to use for Azure OpenAI',
 		},
+		{
+			displayName: 'Token Refresh Buffer (seconds)',
+			name: 'tokenRefreshBuffer',
+			type: 'number',
+			default: 900,
+			description: 'How many seconds before token expiry to trigger refresh. Default: 900 (15 minutes). Range: 60-3600.',
+			placeholder: '900',
+			hint: 'Increase for long-running workflows (e.g., 1800 for 30 min), decrease for quick workflows (e.g., 300 for 5 min)',
+		},
 	];
 
 	authenticate: IAuthenticateGeneric = {

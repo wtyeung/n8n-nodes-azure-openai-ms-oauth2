@@ -136,19 +136,17 @@ async function getCurrentToken(
 		const now = Math.floor(Date.now() / 1000);
 		const expiresAt = expiryTime;
 		
-		// Get buffer time from environment variable or use default (15 minutes)
+		// Get buffer time from credentials or use default (15 minutes)
 		// Valid range: 60 seconds (1 minute) to 3600 seconds (60 minutes)
-		// eslint-disable-next-line @n8n/community-nodes/no-restricted-globals
-		const envBufferTime = process.env.AZURE_OPENAI_TOKEN_REFRESH_BUFFER_SECONDS;
+		const credentialBufferTime = credentials.tokenRefreshBuffer as number | undefined;
 		let bufferTime = 900; // Default: 15 minutes
 		
-		if (envBufferTime) {
-			const parsedBuffer = parseInt(envBufferTime, 10);
-			if (!isNaN(parsedBuffer) && parsedBuffer >= 60 && parsedBuffer <= 3600) {
-				bufferTime = parsedBuffer;
+		if (credentialBufferTime !== undefined) {
+			if (credentialBufferTime >= 60 && credentialBufferTime <= 3600) {
+				bufferTime = credentialBufferTime;
 				context.logger.info(`Using custom token refresh buffer: ${bufferTime} seconds (${Math.floor(bufferTime / 60)} minutes)`);
 			} else {
-				context.logger.warn(`Invalid AZURE_OPENAI_TOKEN_REFRESH_BUFFER_SECONDS value: ${envBufferTime}. Must be between 60 and 3600. Using default: ${bufferTime} seconds.`);
+				context.logger.warn(`Invalid tokenRefreshBuffer value: ${credentialBufferTime}. Must be between 60 and 3600. Using default: ${bufferTime} seconds.`);
 			}
 		}
 
@@ -421,7 +419,7 @@ export class LmChatAzureOpenAiMsOAuth2 implements INodeType {
 	};
 
 	async supplyData(this: ISupplyDataFunctions, itemIndex: number): Promise<SupplyData> {
-		this.logger.info('=== supplyData called for Azure OpenAI Chat Model (MS OAuth2) v1.3.2 ===');
+		this.logger.info('=== supplyData called for Azure OpenAI Chat Model (MS OAuth2) v1.4.0 ===');
 		
 		const deploymentName = this.getNodeParameter('deploymentName', itemIndex) as string;
 		const options = this.getNodeParameter('options', itemIndex, {}) as {

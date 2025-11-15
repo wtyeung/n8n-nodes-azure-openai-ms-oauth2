@@ -162,29 +162,28 @@ The AI Agent can use your Azure OpenAI deployment with OAuth2 authentication for
 
 ## Configuration
 
-### Environment Variables
+### Token Refresh Buffer
 
-#### `AZURE_OPENAI_TOKEN_REFRESH_BUFFER_SECONDS`
+You can configure how early the token should be refreshed before it expires in the **credential settings**.
 
-Configure how early the token should be refreshed before expiration.
+1. Go to **Credentials** → **Azure OpenAI MS OAuth2 API**
+2. Set **Token Refresh Buffer (seconds)** field
 
+**Settings:**
 - **Default**: `900` (15 minutes)
 - **Valid Range**: `60` to `3600` (1 minute to 60 minutes)
 - **Purpose**: Ensures the token remains valid throughout workflow execution
 
-**Example:**
-```bash
-# Refresh token 30 minutes before expiration (for very long workflows)
-export AZURE_OPENAI_TOKEN_REFRESH_BUFFER_SECONDS=1800
-
-# Refresh token 5 minutes before expiration (for quick workflows)
-export AZURE_OPENAI_TOKEN_REFRESH_BUFFER_SECONDS=300
-```
-
 **When to adjust:**
-- **Longer buffer (20-30 min)**: For workflows that take a long time to execute
-- **Shorter buffer (5-10 min)**: For quick workflows to minimize unnecessary refreshes
-- **Default (15 min)**: Suitable for most use cases
+- **Longer buffer (1800-3600 sec / 30-60 min)**: For workflows that take a long time to execute
+- **Shorter buffer (300-600 sec / 5-10 min)**: For quick workflows to minimize unnecessary refreshes
+- **Default (900 sec / 15 min)**: Suitable for most use cases
+
+**Benefits of credential-level setting:**
+- ✅ Different credentials can have different buffer times
+- ✅ Easy to change in the n8n UI
+- ✅ No need to restart n8n
+- ✅ Per-environment configuration (dev vs prod)
 
 ## Troubleshooting
 
