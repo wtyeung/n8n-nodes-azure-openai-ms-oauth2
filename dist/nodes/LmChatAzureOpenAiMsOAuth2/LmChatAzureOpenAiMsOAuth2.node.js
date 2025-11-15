@@ -74,7 +74,7 @@ async function getCurrentToken(context, deploymentName) {
     if (expiryTime) {
         const now = Math.floor(Date.now() / 1000);
         const expiresAt = expiryTime;
-        const credentialBufferTime = credentials.tokenRefreshBuffer;
+        const credentialBufferTime = credentials.refreshBeforeExpirySeconds;
         let bufferTime = 900;
         if (credentialBufferTime !== undefined) {
             if (credentialBufferTime >= 60 && credentialBufferTime <= 3600) {
@@ -82,7 +82,7 @@ async function getCurrentToken(context, deploymentName) {
                 context.logger.info(`Using custom token refresh buffer: ${bufferTime} seconds (${Math.floor(bufferTime / 60)} minutes)`);
             }
             else {
-                context.logger.warn(`Invalid tokenRefreshBuffer value: ${credentialBufferTime}. Must be between 60 and 3600. Using default: ${bufferTime} seconds.`);
+                context.logger.warn(`Invalid refreshBeforeExpirySeconds value: ${credentialBufferTime}. Must be between 60 and 3600. Using default: ${bufferTime} seconds.`);
             }
         }
         if (now >= expiresAt - bufferTime) {

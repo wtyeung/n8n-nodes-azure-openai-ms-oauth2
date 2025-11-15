@@ -116,6 +116,7 @@ async function getCurrentToken(
 				});
 				return refreshedOauthData.access_token;
 			}
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		} catch (error: any) {
 			context.logger.error('TEST MODE: Token refresh test failed', { 
 				error: error.message,
@@ -138,7 +139,7 @@ async function getCurrentToken(
 		
 		// Get buffer time from credentials or use default (15 minutes)
 		// Valid range: 60 seconds (1 minute) to 3600 seconds (60 minutes)
-		const credentialBufferTime = credentials.tokenRefreshBuffer as number | undefined;
+		const credentialBufferTime = credentials.refreshBeforeExpirySeconds as number | undefined;
 		let bufferTime = 900; // Default: 15 minutes
 		
 		if (credentialBufferTime !== undefined) {
@@ -146,7 +147,7 @@ async function getCurrentToken(
 				bufferTime = credentialBufferTime;
 				context.logger.info(`Using custom token refresh buffer: ${bufferTime} seconds (${Math.floor(bufferTime / 60)} minutes)`);
 			} else {
-				context.logger.warn(`Invalid tokenRefreshBuffer value: ${credentialBufferTime}. Must be between 60 and 3600. Using default: ${bufferTime} seconds.`);
+				context.logger.warn(`Invalid refreshBeforeExpirySeconds value: ${credentialBufferTime}. Must be between 60 and 3600. Using default: ${bufferTime} seconds.`);
 			}
 		}
 
