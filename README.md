@@ -2,7 +2,7 @@
 
 This is an n8n community node that provides an **Azure OpenAI Chat Model** with **Microsoft OAuth2 authentication** for LangChain workflows in n8n.
 
-Azure OpenAI Service provides REST API access to OpenAI's powerful language models including GPT-4, GPT-4o, and GPT-3.5-Turbo. This node uses Microsoft OAuth2 for secure, enterprise-grade authentication instead of API keys.
+Azure OpenAI Service provides REST API access to OpenAI's powerful language models including GPT-4o, GPT-4.1, and o1. This node uses Microsoft OAuth2 for secure, enterprise-grade authentication instead of API keys.
 
 **Perfect for Azure API Management (APIM) as an AI Gateway**: This node is designed to work seamlessly with [Azure API Management as an AI Gateway](https://learn.microsoft.com/en-us/azure/api-management/azure-ai-foundry-api), enabling centralized management, monitoring, rate limiting, and security policies for your Azure OpenAI deployments.
 
@@ -64,7 +64,7 @@ To use this node, you need:
 ### Prerequisites
 1. An Azure subscription
 2. Azure OpenAI resource created in Azure Portal
-3. A deployed model (e.g., GPT-4, GPT-3.5-Turbo)
+3. A deployed model (e.g., GPT-4o, GPT-4.1, o1)
 4. Azure AD app registration with appropriate permissions
 
 ### Setting up Microsoft OAuth2 credentials
@@ -105,10 +105,10 @@ To use this node, you need:
    - Configure APIM backend to point to your Azure OpenAI resource
    - APIM will rewrite the URL from your APIM path to the Azure OpenAI endpoint
    - Example flow:
-     - n8n calls: `https://your-apim.azure-api.net/aiProject/deployments/gpt-4/chat/completions`
+     - n8n calls: `https://your-apim.azure-api.net/aiProject/deployments/gpt-4o/chat/completions`
      - n8n sends: `api-key: <jwt-token>`
      - APIM extracts and validates JWT from `api-key` header
-     - APIM rewrites to: `https://your-resource.openai.azure.com/openai/deployments/gpt-4/chat/completions`
+     - APIM rewrites to: `https://your-resource.openai.azure.com/openai/deployments/gpt-4o/chat/completions`
      - APIM replaces `api-key` header with actual Azure OpenAI credentials
    - APIM validates the JWT and forwards requests to Azure OpenAI with its own credentials
 
@@ -128,7 +128,7 @@ To use this node, you need:
 2. In the AI Agent configuration, add a **Language Model**
 3. Select **Azure OpenAI Chat Model (MS OAuth2)**
 4. Configure your credentials
-5. Set the **Deployment Name** parameter to your Azure OpenAI deployment name (e.g., `gpt-4-deployment`)
+5. Set the **Deployment Name** parameter to your Azure OpenAI deployment name (e.g., `gpt-4o-deployment`)
    - This is the deployment name configured in your Azure OpenAI resource, NOT the model name
 6. Adjust options as needed:
    - **Frequency Penalty**: Reduces repetition (-2 to 2, default: 0)
@@ -179,15 +179,23 @@ Token expires at: 11:00 AM (60 minutes later)
 Buffer time: 15 minutes (900 seconds)
 
 Timeline:
-10:00 AM ─────────────── 10:45 AM ─────────────── 11:00 AM
-   ↑                         ↑                        ↑
-Token issued          Refresh triggered         Token expires
-                    (15 min before expiry)
+10:00 AM ──────────────────────────────── 10:45 AM ──────── 11:00 AM
+   ↑                                           ↑               ↑
+Token issued                          Refresh point    Token expires
+                                    (15 min before)
 
-Your workflow starts at 10:40 AM:
-- Token will be refreshed at 10:45 AM (before it expires at 11:00 AM)
-- Workflow continues with fresh token, valid until 11:45 AM
-- No mid-workflow authentication failures!
+Example 1 - Workflow starts at 10:30 AM (30 min remaining):
+✅ Token valid period: 30 minutes > Buffer: 15 minutes
+- Node checks token: 30 min remaining, sufficient for workflow
+- No refresh needed
+- Workflow runs successfully
+
+Example 2 - Workflow starts at 10:59 AM (1 min remaining):
+⚠️ Token valid period: 1 minute < Buffer: 15 minutes
+- Node checks token: only 1 min remaining → triggers refresh
+- New token issued, valid until 11:59 AM (60 min validity)
+- Workflow continues safely
+- Without refresh: Token expires in 1 minute → mid-workflow failure!
 ```
 
 #### Configuration Steps
@@ -198,7 +206,7 @@ Your workflow starts at 10:40 AM:
 **Settings:**
 - **Default**: `900` (15 minutes)
 - **Valid Range**: `60` to `3600` (1 minute to 60 minutes)
-- **Purpose**: Prevents token expiry during workflow execution
+- **Purpose**: Ensures a minimum token valid period for workflows to finish. Triggers refresh if remaining validity is shorter than the buffer time.
 
 #### When to Adjust
 
@@ -217,29 +225,18 @@ Your workflow starts at 10:40 AM:
 
 ### Token Refresh Issues
 
-This node implements **automatic token refresh** to prevent authentication failures:
-
-- **JWT Decoding**: Extracts the `exp` claim from the access token to determine exact expiry time
-- **Proactive Refresh**: Automatically refreshes the token before it expires (configurable buffer time)
-- **Manual Refresh**: Uses Azure AD token endpoint with `refresh_token` grant to get a new access token
-- **Per-Execution**: Token is checked and refreshed (if needed) at the start of each workflow execution
-
-**How it works:**
-
-1. When a workflow starts, the node decodes the JWT access token to get the expiry time
-2. If the token expires within the buffer period (default 15 minutes), it triggers a refresh
-3. The node calls Azure AD's token endpoint with the refresh token to get a new access token
-4. The fresh token is used for the entire workflow execution
-
-**If you still experience token expiration issues:**
+**If you experience token expiration issues:**
 
 1. **Verify `offline_access` scope**: The credential automatically adds `offline_access` to your API scope to enable refresh tokens. Check your Azure AD app registration allows this scope.
 
 2. **Check refresh token**: Ensure your Azure AD app is configured to issue refresh tokens. The node logs will show if a refresh token is missing.
 
-3. **Adjust buffer time**: If your workflows take longer than 15 minutes, increase `AZURE_OPENAI_TOKEN_REFRESH_BUFFER_SECONDS`.
+3. **Adjust buffer time**: If your workflows take longer than expected, increase the **Token Refresh Buffer (seconds)** in your credential settings (default: 900 seconds / 15 minutes).
 
-4. **Check logs**: Enable n8n logging to see token refresh attempts and any errors. Look for messages like "Token refreshed successfully via manual refresh".
+4. **Check logs**: Enable n8n logging to see token refresh attempts. Look for messages like:
+   - `✅ SUCCESS: Token refreshed via HTTP request (n8n OAuth2)`
+   - `✅ SUCCESS: Token refreshed via manual refresh_token grant`
+   - `✓ Token still valid, expires in X minutes`
 
 ## Resources
 
