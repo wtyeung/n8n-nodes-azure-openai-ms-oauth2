@@ -46,9 +46,9 @@ class AzureOpenAiMsOAuth2Api {
                 name: 'tokenRefreshBuffer',
                 type: 'number',
                 default: 900,
-                description: 'How many seconds before token expiry to trigger refresh. Default: 900 (15 minutes). Range: 60-3600.',
+                description: 'How many seconds before token expiry to proactively refresh the token. This prevents the token from expiring in the middle of a workflow execution. Default: 900 (15 minutes). Range: 60-3600.',
                 placeholder: '900',
-                hint: 'Increase for long-running workflows (e.g., 1800 for 30 min), decrease for quick workflows (e.g., 300 for 5 min)',
+                hint: 'Set based on your workflow duration: Long workflows (30-60 min) → 1800-3600, Quick workflows (5-10 min) → 300-600. This ensures the token stays valid throughout the entire workflow.',
             },
         ];
         this.authenticate = {

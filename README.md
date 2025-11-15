@@ -164,7 +164,32 @@ The AI Agent can use your Azure OpenAI deployment with OAuth2 authentication for
 
 ### Token Refresh Buffer
 
-You can configure how early the token should be refreshed before it expires in the **credential settings**.
+#### Why This Matters
+
+OAuth2 access tokens have an expiration time (typically 60 minutes). If your workflow takes a long time to execute, **the token might expire in the middle of the workflow**, causing authentication failures and workflow errors.
+
+The **Token Refresh Buffer** setting allows you to **proactively refresh the token before it expires**, ensuring your workflow completes successfully even if it runs for an extended period.
+
+#### How It Works
+
+```
+Token issued at: 10:00 AM
+Token expires at: 11:00 AM (60 minutes later)
+Buffer time: 15 minutes (900 seconds)
+
+Timeline:
+10:00 AM ─────────────── 10:45 AM ─────────────── 11:00 AM
+   ↑                         ↑                        ↑
+Token issued          Refresh triggered         Token expires
+                    (15 min before expiry)
+
+Your workflow starts at 10:40 AM:
+- Token will be refreshed at 10:45 AM (before it expires at 11:00 AM)
+- Workflow continues with fresh token, valid until 11:45 AM
+- No mid-workflow authentication failures!
+```
+
+#### Configuration Steps
 
 1. Go to **Credentials** → **Azure OpenAI MS OAuth2 API**
 2. Set **Token Refresh Buffer (seconds)** field
@@ -172,18 +197,20 @@ You can configure how early the token should be refreshed before it expires in t
 **Settings:**
 - **Default**: `900` (15 minutes)
 - **Valid Range**: `60` to `3600` (1 minute to 60 minutes)
-- **Purpose**: Ensures the token remains valid throughout workflow execution
+- **Purpose**: Prevents token expiry during workflow execution
 
-**When to adjust:**
-- **Longer buffer (1800-3600 sec / 30-60 min)**: For workflows that take a long time to execute
-- **Shorter buffer (300-600 sec / 5-10 min)**: For quick workflows to minimize unnecessary refreshes
-- **Default (900 sec / 15 min)**: Suitable for most use cases
+#### When to Adjust
 
-**Benefits of credential-level setting:**
-- ✅ Different credentials can have different buffer times
-- ✅ Easy to change in the n8n UI
-- ✅ No need to restart n8n
-- ✅ Per-environment configuration (dev vs prod)
+| Workflow Type | Buffer Time | Reason |
+|--------------|-------------|--------|
+| **Quick workflows** (< 5 min) | 300-600 sec (5-10 min) | Minimize unnecessary refreshes |
+| **Medium workflows** (5-20 min) | 900-1200 sec (15-20 min) | Default, suitable for most cases |
+| **Long workflows** (20-60 min) | 1800-3600 sec (30-60 min) | Ensure token stays valid throughout |
+
+**Example scenarios:**
+- **AI Agent with multiple steps**: If your workflow has 10+ AI calls that take 30 minutes total → Set buffer to 1800 seconds (30 min)
+- **Simple chat completion**: Single AI call that takes 30 seconds → Default 900 seconds (15 min) is fine
+- **Batch processing**: Processing 100 items that takes 45 minutes → Set buffer to 3600 seconds (60 min)
 
 ## Troubleshooting
 
