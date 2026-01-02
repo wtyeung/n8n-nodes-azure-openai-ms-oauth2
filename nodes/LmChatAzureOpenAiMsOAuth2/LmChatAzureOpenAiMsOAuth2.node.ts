@@ -6,6 +6,8 @@ import type {
 } from 'n8n-workflow';
 import { NodeOperationError } from 'n8n-workflow';
 import { AzureChatOpenAI } from '@langchain/openai';
+import { BaseCallbackHandler } from '@langchain/core/callbacks/base';
+import type { LLMResult } from '@langchain/core/outputs';
 
 interface OAuthTokenData {
 	access_token?: string;
@@ -420,7 +422,7 @@ export class LmChatAzureOpenAiMsOAuth2 implements INodeType {
 	};
 
 	async supplyData(this: ISupplyDataFunctions, itemIndex: number): Promise<SupplyData> {
-		this.logger.info('=== supplyData called for Azure OpenAI Chat Model (MS OAuth2) v1.4.3 ===');
+		this.logger.info('=== supplyData called for Azure OpenAI Chat Model (MS OAuth2) v1.5.0 ===');
 		
 		const deploymentName = this.getNodeParameter('deploymentName', itemIndex) as string;
 		const options = this.getNodeParameter('options', itemIndex, {}) as {
@@ -458,6 +460,60 @@ export class LmChatAzureOpenAiMsOAuth2 implements INodeType {
 		// Get initial credentials with fresh token
 		const initialCreds = await getCredentialsWithFreshToken();
 
+		// Create a callback handler to track token usage and log input/output
+		class TokenUsageHandler extends BaseCallbackHandler {
+			name = 'token_usage_handler';
+			
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			async handleLLMStart(llm: any, prompts: string[]): Promise<void> {
+				this.logger?.info('LLM Input:', {
+					prompts: prompts.length > 0 ? prompts : 'No prompts',
+					promptCount: prompts.length,
+				});
+			}
+			
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			async handleLLMEnd(output: LLMResult): Promise<void> {
+				// Log output generations
+				if (output.generations && output.generations.length > 0) {
+					const generations = output.generations[0];
+					if (generations && generations.length > 0) {
+						const firstGen = generations[0];
+						this.logger?.info('LLM Output:', {
+							text: firstGen.text,
+							generationCount: generations.length,
+						});
+					}
+				}
+				
+				// Log token usage
+				const tokenUsage = output.llmOutput?.tokenUsage;
+				if (tokenUsage) {
+					this.logger?.info('Token usage:', {
+						promptTokens: tokenUsage.promptTokens,
+						completionTokens: tokenUsage.completionTokens,
+						totalTokens: tokenUsage.totalTokens,
+					});
+				}
+			}
+			
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			async handleLLMError(error: any): Promise<void> {
+				this.logger?.error('LLM Error:', {
+					error: error.message || error,
+				});
+			}
+			
+			private logger?: ISupplyDataFunctions['logger'];
+			
+			setLogger(logger: ISupplyDataFunctions['logger']): void {
+				this.logger = logger;
+			}
+		}
+
+		const tokenUsageHandler = new TokenUsageHandler();
+		tokenUsageHandler.setLogger(this.logger);
+
 		// Create model with fresh token
 		// Token refresh happens in getCurrentToken() which is called by getCredentialsWithFreshToken()
 		// The token is checked for expiry and refreshed proactively before model initialization
@@ -478,6 +534,8 @@ export class LmChatAzureOpenAiMsOAuth2 implements INodeType {
 						response_format: { type: options.responseFormat },
 					}
 				: undefined,
+			callbacks: [tokenUsageHandler],
+			streamUsage: true,
 		});
 
 		return {
