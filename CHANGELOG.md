@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.5.2] - 2026-01-02
+
+### Fixed
+- **n8n 2.x Compatibility**: Updated `N8nLlmTracing` to match n8n 2.x implementation
+  - Added AI event logging (`logAiEvent`) for proper execution tracking in n8n 2.x
+  - Enhanced message parsing with `toJSON()` support for better data serialization
+  - Improved error handling and comments matching n8n 2.x standards
+  - Animation and logging now work correctly in n8n 2.1.4+
+  - Maintains backward compatibility with n8n 1.x
+
 ## [1.5.1] - 2026-01-02
 
 ### Fixed

@@ -11,6 +11,15 @@ import pick from 'lodash/pick';
 import type { IDataObject, ISupplyDataFunctions, JsonObject } from 'n8n-workflow';
 import { NodeConnectionTypes, NodeError, NodeOperationError } from 'n8n-workflow';
 
+function logAiEvent(executionFunctions: ISupplyDataFunctions, eventName: string, data: IDataObject) {
+	try {
+		// @ts-ignore - logAiEvent may not be available in older n8n versions
+		executionFunctions.logAiEvent?.(eventName as any, data);
+	} catch (error) {
+		// Silently fail if logAiEvent is not available (older n8n versions)
+	}
+}
+
 type TokensUsageParser = (result: LLMResult) => {
 	completionTokens: number;
 	promptTokens: number;
@@ -26,6 +35,8 @@ type RunDetail = {
 export class N8nLlmTracing extends BaseCallbackHandler {
 	name = 'N8nLlmTracing';
 
+	// This flag makes sure that LangChain will wait for the handlers to finish before continuing
+	// This is crucial for the handleLLMError handler to work correctly
 	awaitHandlers = true;
 
 	connectionType = NodeConnectionTypes.AiLanguageModel;
@@ -36,6 +47,11 @@ export class N8nLlmTracing extends BaseCallbackHandler {
 
 	#parentRunIndex?: number;
 
+	/**
+	 * A map to associate LLM run IDs to run details.
+	 * Key: Unique identifier for each LLM run (run ID)
+	 * Value: RunDetails object
+	 */
 	runsMap: Record<string, RunDetail> = {};
 
 	options = {
@@ -67,6 +83,8 @@ export class N8nLlmTracing extends BaseCallbackHandler {
 	}
 
 	async handleLLMEnd(output: LLMResult, runId: string) {
+		// The fallback should never happen since handleLLMStart should always set the run details
+		// but just in case, we set the index to the length of the runsMap
 		const runDetails = this.runsMap[runId] ?? { index: Object.keys(this.runsMap).length };
 
 		output.generations = output.generations.map((gen) =>
@@ -88,11 +106,21 @@ export class N8nLlmTracing extends BaseCallbackHandler {
 			response: { generations: output.generations },
 		};
 
+		// If the LLM response contains actual tokens usage, otherwise fallback to the estimate
 		if (tokenUsage.completionTokens > 0) {
 			response.tokenUsage = tokenUsage;
 		} else {
 			response.tokenUsageEstimate = tokenUsageEstimate;
 		}
+
+		const parsedMessages =
+			typeof runDetails.messages === 'string'
+				? runDetails.messages
+				: runDetails.messages.map((message) => {
+						if (typeof message === 'string') return message;
+						if (typeof (message as any)?.toJSON === 'function') return (message as any).toJSON();
+						return message;
+					});
 
 		const sourceNodeRunIndex =
 			this.#parentRunIndex !== undefined ? this.#parentRunIndex + runDetails.index : undefined;
@@ -104,6 +132,12 @@ export class N8nLlmTracing extends BaseCallbackHandler {
 			undefined,
 			sourceNodeRunIndex,
 		);
+
+		logAiEvent(this.executionFunctions, 'ai-llm-generated-output', {
+			messages: parsedMessages,
+			options: runDetails.options,
+			response,
+		});
 	}
 
 	async handleLLMStart(llm: Serialized, prompts: string[], runId: string) {
@@ -128,6 +162,7 @@ export class N8nLlmTracing extends BaseCallbackHandler {
 			sourceNodeRunIndex,
 		);
 
+		// Save the run details for later use when processing handleLLMEnd event
 		this.runsMap[runId] = {
 			index,
 			options,
@@ -138,6 +173,7 @@ export class N8nLlmTracing extends BaseCallbackHandler {
 	async handleLLMError(error: IDataObject | Error, runId: string, parentRunId?: string) {
 		const runDetails = this.runsMap[runId] ?? { index: Object.keys(this.runsMap).length };
 
+		// Filter out non-x- headers to avoid leaking sensitive information in logs
 		if (typeof error === 'object' && error?.hasOwnProperty('headers')) {
 			const errorWithHeaders = error as { headers: Record<string, unknown> };
 
@@ -155,6 +191,7 @@ export class N8nLlmTracing extends BaseCallbackHandler {
 
 			this.executionFunctions.addOutputData(this.connectionType, runDetails.index, error);
 		} else {
+			// If the error is not a NodeError, we wrap it in a NodeOperationError
 			this.executionFunctions.addOutputData(
 				this.connectionType,
 				runDetails.index,
@@ -163,8 +200,15 @@ export class N8nLlmTracing extends BaseCallbackHandler {
 				}),
 			);
 		}
+
+		logAiEvent(this.executionFunctions, 'ai-llm-errored', {
+			error: Object.keys(error).length === 0 ? error.toString() : error,
+			runId,
+			parentRunId,
+		});
 	}
 
+	// Used to associate subsequent runs with the correct parent run in subnodes of subnodes
 	setParentRunIndex(runIndex: number) {
 		this.#parentRunIndex = runIndex;
 	}
