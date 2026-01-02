@@ -1,12 +1,25 @@
 {
     "name": "n8n-nodes-azure-openai-ms-oauth2",
-    "version": "1.5.0",
+    "version": "1.5.1",
     "description": "Azure OpenAI Chat Model with MS OAuth2 for n8n",
     "license": "MIT",
     "homepage": "https://github.com/wtyeung/n8n-nodes-azure-openai-ms-oauth2",
-    "keywords": ["n8n-community-node-package", "n8n-nodes-langchain", "azure-openai", "oauth2", "apim", "ai-gateway"],
-    "author": { "name": "Tim Yeung", "email": "tim.yeung@hku.hk" },
-    "repository": { "type": "git", "url": "https://github.com/wtyeung/n8n-nodes-azure-openai-ms-oauth2.git" },
+    "keywords": [
+        "n8n-community-node-package",
+        "n8n-nodes-langchain",
+        "azure-openai",
+        "oauth2",
+        "apim",
+        "ai-gateway"
+    ],
+    "author": {
+        "name": "Tim Yeung",
+        "email": "tim.yeung@hku.hk"
+    },
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/wtyeung/n8n-nodes-azure-openai-ms-oauth2.git"
+    },
     "scripts": {
         "build": "n8n-node build",
         "build:watch": "tsc --watch",
@@ -15,7 +28,9 @@
         "lint:fix": "n8n-node lint --fix",
         "release": "n8n-node release"
     },
-    "files": ["dist"],
+    "files": [
+        "dist"
+    ],
     "n8n": {
         "n8nNodesApiVersion": 1,
         "credentials": [
@@ -27,6 +42,7 @@
     },
     "devDependencies": {
         "@n8n/node-cli": "*",
+        "@types/lodash": "^4.17.21",
         "@types/node": "^20.10.0",
         "eslint": "9.32.0",
         "prettier": "3.6.2",
@@ -34,8 +50,11 @@
         "typescript": "5.9.2"
     },
     "peerDependencies": {
-        "n8n-workflow": "*",
         "@langchain/openai": ">=0.3.0",
-        "langchain": ">=0.3.0"
+        "langchain": ">=0.3.0",
+        "n8n-workflow": "*"
+    },
+    "dependencies": {
+        "lodash": "^4.17.21"
     }
 }

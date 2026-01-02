@@ -3,7 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.LmChatAzureOpenAiMsOAuth2 = void 0;
 const n8n_workflow_1 = require("n8n-workflow");
 const openai_1 = require("@langchain/openai");
-const base_1 = require("@langchain/core/callbacks/base");
+const N8nLlmTracing_1 = require("./N8nLlmTracing");
 function decodeJWT(token) {
     try {
         const parts = token.split('.');
@@ -322,7 +322,7 @@ class LmChatAzureOpenAiMsOAuth2 {
     }
     async supplyData(itemIndex) {
         var _a, _b;
-        this.logger.info('=== supplyData called for Azure OpenAI Chat Model (MS OAuth2) v1.5.0 ===');
+        this.logger.info('=== supplyData called for Azure OpenAI Chat Model (MS OAuth2) v1.5.1 ===');
         const deploymentName = this.getNodeParameter('deploymentName', itemIndex);
         const options = this.getNodeParameter('options', itemIndex, {});
         const getCredentialsWithFreshToken = async () => {
@@ -338,51 +338,6 @@ class LmChatAzureOpenAiMsOAuth2 {
             };
         };
         const initialCreds = await getCredentialsWithFreshToken();
-        class TokenUsageHandler extends base_1.BaseCallbackHandler {
-            constructor() {
-                super(...arguments);
-                this.name = 'token_usage_handler';
-            }
-            async handleLLMStart(llm, prompts) {
-                var _a;
-                (_a = this.logger) === null || _a === void 0 ? void 0 : _a.info('LLM Input:', {
-                    prompts: prompts.length > 0 ? prompts : 'No prompts',
-                    promptCount: prompts.length,
-                });
-            }
-            async handleLLMEnd(output) {
-                var _a, _b, _c;
-                if (output.generations && output.generations.length > 0) {
-                    const generations = output.generations[0];
-                    if (generations && generations.length > 0) {
-                        const firstGen = generations[0];
-                        (_a = this.logger) === null || _a === void 0 ? void 0 : _a.info('LLM Output:', {
-                            text: firstGen.text,
-                            generationCount: generations.length,
-                        });
-                    }
-                }
-                const tokenUsage = (_b = output.llmOutput) === null || _b === void 0 ? void 0 : _b.tokenUsage;
-                if (tokenUsage) {
-                    (_c = this.logger) === null || _c === void 0 ? void 0 : _c.info('Token usage:', {
-                        promptTokens: tokenUsage.promptTokens,
-                        completionTokens: tokenUsage.completionTokens,
-                        totalTokens: tokenUsage.totalTokens,
-                    });
-                }
-            }
-            async handleLLMError(error) {
-                var _a;
-                (_a = this.logger) === null || _a === void 0 ? void 0 : _a.error('LLM Error:', {
-                    error: error.message || error,
-                });
-            }
-            setLogger(logger) {
-                this.logger = logger;
-            }
-        }
-        const tokenUsageHandler = new TokenUsageHandler();
-        tokenUsageHandler.setLogger(this.logger);
         const model = new openai_1.AzureChatOpenAI({
             azureOpenAIApiDeploymentName: deploymentName,
             azureOpenAIApiKey: initialCreds.accessToken,
@@ -400,7 +355,7 @@ class LmChatAzureOpenAiMsOAuth2 {
                     response_format: { type: options.responseFormat },
                 }
                 : undefined,
-            callbacks: [tokenUsageHandler],
+            callbacks: [new N8nLlmTracing_1.N8nLlmTracing(this)],
             streamUsage: true,
         });
         return {

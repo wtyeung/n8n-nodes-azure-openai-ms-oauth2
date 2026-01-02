@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.5.1] - 2026-01-02
+
+### Fixed
+- **Execution Animation & Visible Logs**: Implemented proper n8n integration using `N8nLlmTracing`
+  - Now shows execution animation during model invocation
+  - Input/output data visible in n8n execution UI (not just logs)
+  - Token usage displayed in execution data
+  - Proper integration with n8n's `addInputData()` and `addOutputData()` APIs
+  - Matches behavior of built-in n8n LangChain chat model nodes
+
+### Added
+- `N8nLlmTracing` callback handler for proper n8n execution tracking
+- `lodash` dependency for data processing in callbacks
+
+### Changed
+- Replaced basic `BaseCallbackHandler` with specialized `N8nLlmTracing`
+- Execution data now properly flows through n8n's connection system
+
 ## [1.5.0] - 2026-01-02
 
 ### Added
