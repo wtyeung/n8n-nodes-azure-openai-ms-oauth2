@@ -116,11 +116,11 @@ export class N8nLlmTracing extends BaseCallbackHandler {
 		const parsedMessages =
 			typeof runDetails.messages === 'string'
 				? runDetails.messages
-				: runDetails.messages.map((message) => {
-						if (typeof message === 'string') return message;
-						if (typeof (message as any)?.toJSON === 'function') return (message as any).toJSON();
-						return message;
-					});
+			: runDetails.messages.map((message: BaseMessage | string) => {
+					if (typeof message === 'string') return message;
+					if (typeof message.toJSON === 'function') return message.toJSON();
+					return message;
+				});
 
 		const sourceNodeRunIndex =
 			this.#parentRunIndex !== undefined ? this.#parentRunIndex + runDetails.index : undefined;
