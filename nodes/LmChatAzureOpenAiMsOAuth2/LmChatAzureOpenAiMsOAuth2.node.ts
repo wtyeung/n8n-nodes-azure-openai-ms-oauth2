@@ -4,7 +4,7 @@ import type {
 	INodeTypeDescription,
 	SupplyData,
 } from 'n8n-workflow';
-import { NodeOperationError } from 'n8n-workflow';
+import { NodeConnectionTypes, NodeOperationError } from 'n8n-workflow';
 import { AzureChatOpenAI } from '@langchain/openai';
 import { N8nLlmTracing } from './N8nLlmTracing';
 
@@ -292,7 +292,7 @@ export class LmChatAzureOpenAiMsOAuth2 implements INodeType {
 			},
 		},
 		inputs: [],
-		outputs: ['ai_languageModel'],
+		outputs: [NodeConnectionTypes.AiLanguageModel],
 		outputNames: ['Model'],
 		credentials: [
 			{
@@ -421,7 +421,7 @@ export class LmChatAzureOpenAiMsOAuth2 implements INodeType {
 	};
 
 	async supplyData(this: ISupplyDataFunctions, itemIndex: number): Promise<SupplyData> {
-		this.logger.info('=== supplyData called for Azure OpenAI Chat Model (MS OAuth2) v1.5.2 ===');
+		this.logger.info('=== supplyData called for Azure OpenAI Chat Model (MS OAuth2) v1.5.3 ===');
 		
 		const deploymentName = this.getNodeParameter('deploymentName', itemIndex) as string;
 		const options = this.getNodeParameter('options', itemIndex, {}) as {

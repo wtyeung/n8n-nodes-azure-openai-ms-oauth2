@@ -23,6 +23,7 @@ class AzureOpenAiMsOAuth2Api {
                 default: 'api://REPLACE-WITH-YOUR-APP-ID/.default',
                 placeholder: 'api://12345678-1234-1234-1234-123456789abc/.default',
                 description: '⚠️ REQUIRED: Enter your Azure AD application scope. Format: api://<your-app-id>/.default. Note: offline_access is automatically added for token refresh.',
+                noDataExpression: true,
             },
             {
                 displayName: 'Endpoint',
@@ -32,6 +33,7 @@ class AzureOpenAiMsOAuth2Api {
                 default: '',
                 placeholder: 'https://<APIM URL>/aiProject/',
                 description: 'The base endpoint URL for your Azure OpenAI service (with trailing slash)',
+                noDataExpression: true,
             },
             {
                 displayName: 'API Version',
@@ -40,6 +42,7 @@ class AzureOpenAiMsOAuth2Api {
                 required: true,
                 default: '2025-03-01-preview',
                 description: 'The API version to use for Azure OpenAI',
+                noDataExpression: true,
             },
             {
                 displayName: 'Token Refresh Buffer (seconds)',

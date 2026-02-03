@@ -200,7 +200,7 @@ class LmChatAzureOpenAiMsOAuth2 {
                 },
             },
             inputs: [],
-            outputs: ['ai_languageModel'],
+            outputs: [n8n_workflow_1.NodeConnectionTypes.AiLanguageModel],
             outputNames: ['Model'],
             credentials: [
                 {
@@ -322,7 +322,7 @@ class LmChatAzureOpenAiMsOAuth2 {
     }
     async supplyData(itemIndex) {
         var _a, _b;
-        this.logger.info('=== supplyData called for Azure OpenAI Chat Model (MS OAuth2) v1.5.2 ===');
+        this.logger.info('=== supplyData called for Azure OpenAI Chat Model (MS OAuth2) v1.5.3 ===');
         const deploymentName = this.getNodeParameter('deploymentName', itemIndex);
         const options = this.getNodeParameter('options', itemIndex, {});
         const getCredentialsWithFreshToken = async () => {

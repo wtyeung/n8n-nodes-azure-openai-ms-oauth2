@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.5.3] - 2026-01-02
+
+### Fixed
+- **Critical n8n 2.x Fix**: Changed `outputs` from string `'ai_languageModel'` to enum `NodeConnectionTypes.AiLanguageModel`
+  - This was preventing n8n 2.x from properly recognizing the node as a language model
+  - Animation and execution logs now work correctly in n8n 2.1.4+
+  - Node properly integrates with AI Agent and LangChain workflows
+
 ## [1.5.2] - 2026-01-02
 
 ### Fixed
