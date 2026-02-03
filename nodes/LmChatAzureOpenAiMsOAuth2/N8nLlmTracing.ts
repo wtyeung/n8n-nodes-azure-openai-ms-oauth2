@@ -13,9 +13,9 @@ import { NodeConnectionTypes, NodeError, NodeOperationError } from 'n8n-workflow
 
 function logAiEvent(executionFunctions: ISupplyDataFunctions, eventName: string, data: IDataObject) {
 	try {
-		// @ts-ignore - logAiEvent may not be available in older n8n versions
-		executionFunctions.logAiEvent?.(eventName as any, data);
-	} catch (error) {
+		// @ts-expect-error - logAiEvent may not be available in older n8n versions
+		executionFunctions.logAiEvent?.(eventName as 'ai-llm-generated-output' | 'ai-llm-errored', data);
+	} catch {
 		// Silently fail if logAiEvent is not available (older n8n versions)
 	}
 }
@@ -174,7 +174,7 @@ export class N8nLlmTracing extends BaseCallbackHandler {
 		const runDetails = this.runsMap[runId] ?? { index: Object.keys(this.runsMap).length };
 
 		// Filter out non-x- headers to avoid leaking sensitive information in logs
-		if (typeof error === 'object' && error?.hasOwnProperty('headers')) {
+		if (typeof error === 'object' && error && Object.prototype.hasOwnProperty.call(error, 'headers')) {
 			const errorWithHeaders = error as { headers: Record<string, unknown> };
 
 			Object.keys(errorWithHeaders.headers).forEach((key) => {
