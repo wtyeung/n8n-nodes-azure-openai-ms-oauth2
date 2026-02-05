@@ -1,8 +1,8 @@
 # n8n-nodes-azure-openai-ms-oauth2
 
-This is an n8n community node that provides an **Azure OpenAI Chat Model** with **Microsoft OAuth2 authentication** for LangChain workflows in n8n.
+This is an n8n community node that provides **Azure OpenAI Chat Model** and **Embeddings** with **Microsoft OAuth2 authentication** for LangChain workflows in n8n.
 
-Azure OpenAI Service provides REST API access to OpenAI's powerful language models including GPT-4o, GPT-4.1, and o1. This node uses Microsoft OAuth2 for secure, enterprise-grade authentication instead of API keys.
+Azure OpenAI Service provides REST API access to OpenAI's powerful language models including GPT-4o, GPT-4.1, o1, and embedding models like text-embedding-3-small/large. This node uses Microsoft OAuth2 for secure, enterprise-grade authentication instead of API keys.
 
 **Perfect for Azure API Management (APIM) as an AI Gateway**: This node is designed to work seamlessly with [Azure API Management as an AI Gateway](https://learn.microsoft.com/en-us/azure/api-management/azure-ai-foundry-api), enabling centralized management, monitoring, rate limiting, and security policies for your Azure OpenAI deployments.
 
@@ -39,6 +39,13 @@ Or install directly in n8n:
 - **LangChain Chains**: Compatible with all LangChain chain types
 - **Streaming Support**: Real-time response streaming
 - **Execution Visibility**: Full n8n integration with animation and data display
+
+### Embeddings Node
+- **Vector Embeddings**: Generate embeddings for text using Azure OpenAI embedding models
+- **Flexible Authentication**: Supports both `api-key` and `Authorization: Bearer` headers
+- **Model Options**: Configure dimensions, encoding format (float/base64), and user tracking
+- **APIM Compatible**: Works seamlessly with Azure API Management as AI Gateway
+- **Tool Integration**: Can be used as a tool in AI Agent workflows
   - **Execution animation** during model invocation (visual progress indicator)
   - **Input/output data** visible in n8n execution UI (not just logs)
   - **Token usage** displayed in execution data (prompt, completion, total tokens)
@@ -168,6 +175,25 @@ To use this node, you need:
 ```
 
 The AI Agent can use your Azure OpenAI deployment with OAuth2 authentication for secure, enterprise-grade AI workflows.
+
+### Using the Embeddings Node
+
+1. Add **Azure OpenAI Embedding (MS OAuth2)** node to your workflow
+2. Configure your credentials (same as chat model)
+3. Set the **Deployment Name** parameter to your Azure OpenAI embedding deployment name (e.g., `text-embedding-3-small`)
+4. Enter the **Text** to generate embeddings for
+5. Optionally configure:
+   - **Dimensions**: Number of dimensions for the output embeddings (text-embedding-3 models only)
+   - **Encoding Format**: Float (default) or Base64
+   - **User**: Unique identifier for tracking and abuse monitoring
+
+### Example: Generate Embeddings for Vector Database
+
+```
+[Manual Trigger] → [Azure OpenAI Embedding (MS OAuth2)] → [Pinecone/Qdrant/etc.]
+```
+
+The embedding node generates vector embeddings that can be stored in vector databases for semantic search, RAG (Retrieval Augmented Generation), and similarity matching.
 
 ## Configuration
 
