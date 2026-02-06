@@ -3,8 +3,8 @@ import { NodeConnectionTypes } from 'n8n-workflow';
 
 export class LmEmbeddingAzureOpenAiMsOAuth2 implements INodeType {
 	description: INodeTypeDescription = {
-		displayName: 'Azure OpenAI Embedding (MS OAuth2)',
-		name: 'lmEmbeddingAzureOpenAiMsOAuth2',
+		displayName: 'Azure OpenAI Embeddings MS OAuth2',
+		name: 'azureOpenAiEmbeddingsMsOAuth2',
 		icon: 'file:azure-openai.svg',
 		group: ['transform'],
 		version: 1,
