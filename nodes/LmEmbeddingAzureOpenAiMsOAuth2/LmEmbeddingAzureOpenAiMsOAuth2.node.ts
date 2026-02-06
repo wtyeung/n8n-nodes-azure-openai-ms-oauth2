@@ -13,19 +13,6 @@ export class LmEmbeddingAzureOpenAiMsOAuth2 implements INodeType {
 		defaults: {
 			name: 'Azure OpenAI Embedding (MS OAuth2)',
 		},
-		codex: {
-			categories: ['AI'],
-			subcategories: {
-				AI: ['Embeddings'],
-			},
-			resources: {
-				primaryDocumentation: [
-					{
-						url: 'https://github.com/wtyeung/n8n-nodes-azure-openai-ms-oauth2',
-					},
-				],
-			},
-		},
 		usableAsTool: true,
 		inputs: [NodeConnectionTypes.Main],
 		outputs: [NodeConnectionTypes.Main],
