@@ -11,7 +11,7 @@ export class LmEmbeddingAzureOpenAiMsOAuth2 implements INodeType {
 		subtitle: '=Generate Embeddings',
 		description: 'Generate embeddings using Azure OpenAI with Microsoft OAuth2 authentication',
 		defaults: {
-			name: 'Azure OpenAI Embedding (MS OAuth2)',
+			name: 'Azure OpenAI Embeddings MS OAuth2',
 		},
 		usableAsTool: true,
 		inputs: [NodeConnectionTypes.Main],
@@ -36,7 +36,7 @@ export class LmEmbeddingAzureOpenAiMsOAuth2 implements INodeType {
 				displayName: 'Deployment Name',
 				name: 'deploymentName',
 				type: 'string',
-				default: '',
+				default: 'text-embedding-3-small',
 				required: true,
 				description: 'The deployment name you chose when you deployed the embedding model in Azure OpenAI',
 				placeholder: 'text-embedding-3-small',
@@ -85,8 +85,8 @@ export class LmEmbeddingAzureOpenAiMsOAuth2 implements INodeType {
 						displayName: 'Dimensions',
 						name: 'dimensions',
 						type: 'number',
-						default: undefined,
-						description: 'The number of dimensions the resulting output embeddings should have. Only supported in text-embedding-3 and later models.',
+						default: 1536,
+						description: 'The number of dimensions the resulting output embeddings should have. Only supported in text-embedding-3 and later models. Default: 1536 for text-embedding-3-small, 3072 for text-embedding-3-large.',
 						routing: {
 							send: {
 								type: 'body',
@@ -114,19 +114,6 @@ export class LmEmbeddingAzureOpenAiMsOAuth2 implements INodeType {
 							send: {
 								type: 'body',
 								property: 'encoding_format',
-							},
-						},
-					},
-					{
-						displayName: 'User',
-						name: 'user',
-						type: 'string',
-						default: '',
-						description: 'A unique identifier representing your end-user, which can help Azure OpenAI to monitor and detect abuse',
-						routing: {
-							send: {
-								type: 'body',
-								property: 'user',
 							},
 						},
 					},
