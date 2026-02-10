@@ -483,6 +483,7 @@ export class LmChatAzureOpenAiMsOAuth2 implements INodeType {
 						response_format: { type: options.responseFormat },
 					}
 				: undefined,
+			streaming: false,
 			callbacks: [new N8nLlmTracing(this)],
 		});
 
