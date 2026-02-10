@@ -462,7 +462,11 @@ export class LmChatAzureOpenAiMsOAuth2 implements INodeType {
 		// Create model with fresh token
 		// Token refresh happens in getCurrentToken() which is called by getCredentialsWithFreshToken()
 		// The token is checked for expiry and refreshed proactively before model initialization
+		const timeout = options.timeout ?? 60000;
 		const model = new AzureChatOpenAI({
+			// model name is required for correct internal logic (e.g. maxTokens vs maxCompletionTokens mapping)
+			// and for proper tool call response parsing in the agent loop
+			model: deploymentName,
 			azureOpenAIApiDeploymentName: deploymentName,
 			azureOpenAIApiKey: initialCreds.accessToken, // Fresh JWT token passed as api-key for APIM to validate
 			azureOpenAIEndpoint: initialCreds.endpoint,
@@ -472,7 +476,7 @@ export class LmChatAzureOpenAiMsOAuth2 implements INodeType {
 			topP: options.topP,
 			frequencyPenalty: options.frequencyPenalty,
 			presencePenalty: options.presencePenalty,
-			timeout: options.timeout ?? 60000,
+			timeout,
 			maxRetries: options.maxRetries ?? 2,
 			modelKwargs: options.responseFormat
 				? {
