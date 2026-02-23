@@ -143,7 +143,9 @@ To use this node, you need:
 2. In the AI Agent configuration, add a **Language Model**
 3. Select **Azure OpenAI Chat Model (MS OAuth2)**
 4. Configure your credentials
-5. Set the **Deployment Name** parameter to your Azure OpenAI deployment name (e.g., `gpt-4o-deployment`)
+5. Select the **Model** using one of two methods:
+   - **From List**: Select from predefined models (configured via `AZURE_OPENAI_MODELS` environment variable)
+   - **By ID**: Enter the deployment name manually (e.g., `gpt-4o-deployment`)
    - This is the deployment name configured in your Azure OpenAI resource, NOT the model name
 6. Adjust options as needed:
    - **Frequency Penalty**: Reduces repetition (-2 to 2, default: 0)
@@ -196,6 +198,34 @@ The AI Agent can use your Azure OpenAI deployment with OAuth2 authentication for
 The embedding node generates vector embeddings that can be stored in vector databases for semantic search, RAG (Retrieval Augmented Generation), and similarity matching.
 
 ## Configuration
+
+### Dynamic Model Selection
+
+The chat model node supports dynamic model selection via environment variables, allowing you to configure available models centrally.
+
+#### Setting Up Model List
+
+Set the `AZURE_OPENAI_MODELS` environment variable before starting n8n:
+
+```bash
+export AZURE_OPENAI_MODELS="gpt-4o-deployment,*gpt-4-deployment,gpt-35-turbo-deployment"
+n8n start
+```
+
+**Format:**
+- Comma-separated list of deployment names
+- Prefix a model with `*` to mark it as the default
+- Example: `"model1,*model2,model3"` makes `model2` the default
+
+**In the n8n UI:**
+- **From List** mode: Shows dropdown with configured models
+  - Default model appears first with "(default)" label
+  - Searchable/filterable list
+- **By ID** mode: Manual text entry for deployment names
+
+**Without environment variable:**
+- Defaults to: `*gpt-4o,gpt-4,gpt-35-turbo`
+- Users can always switch to "By ID" mode for manual entry
 
 ### Token Refresh Buffer
 

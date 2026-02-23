@@ -225,13 +225,49 @@ class LmChatAzureOpenAiMsOAuth2 {
                     },
                 },
                 {
-                    displayName: 'Deployment Name',
+                    displayName: 'Model',
                     name: 'deploymentName',
-                    type: 'string',
-                    description: 'The deployment name (not model name) configured in your Azure OpenAI resource. <a href="https://learn.microsoft.com/en-us/azure/ai-services/openai/how-to/create-resource">Learn more</a>.',
-                    placeholder: 'e.g. gpt-4-deployment',
-                    default: '',
+                    type: 'resourceLocator',
+                    default: {
+                        mode: 'list',
+                        value: (() => {
+                            const modelsEnv = process.env.AZURE_OPENAI_MODELS || '*gpt-4o,gpt-4,gpt-35-turbo';
+                            const defaultModel = modelsEnv.split(',')
+                                .map(m => m.trim())
+                                .find(m => m.startsWith('*'));
+                            return defaultModel ? defaultModel.replace(/^\*/, '') : '';
+                        })()
+                    },
                     required: true,
+                    description: 'The deployment name configured in your Azure OpenAI resource. Mark default with * in AZURE_OPENAI_MODELS (e.g., "*gpt-4o,gpt-4,gpt-35-turbo")',
+                    modes: [
+                        {
+                            displayName: 'From List',
+                            name: 'list',
+                            type: 'list',
+                            hint: 'Select from models configured via AZURE_OPENAI_MODELS environment variable',
+                            typeOptions: {
+                                searchListMethod: 'getModels',
+                                searchable: true,
+                            },
+                        },
+                        {
+                            displayName: 'By ID',
+                            name: 'id',
+                            type: 'string',
+                            hint: 'Enter the deployment name manually',
+                            validation: [
+                                {
+                                    type: 'regex',
+                                    properties: {
+                                        regex: '.+',
+                                        errorMessage: 'Deployment name cannot be empty',
+                                    },
+                                },
+                            ],
+                            placeholder: 'e.g. gpt-4o-deployment',
+                        },
+                    ],
                 },
                 {
                     displayName: 'Options',
@@ -319,11 +355,47 @@ class LmChatAzureOpenAiMsOAuth2 {
                 },
             ],
         };
+        this.methods = {
+            listSearch: {
+                async getModels(filter) {
+                    const modelsEnv = process.env.AZURE_OPENAI_MODELS || '*gpt-4o,gpt-4,gpt-35-turbo';
+                    const models = modelsEnv.split(',').map(m => m.trim()).filter(m => m.length > 0);
+                    const filteredModels = filter
+                        ? models.filter(m => {
+                            const modelName = m.replace(/^\*/, '');
+                            return modelName.toLowerCase().includes(filter.toLowerCase());
+                        })
+                        : models;
+                    const sortedModels = filteredModels.sort((a, b) => {
+                        const aIsDefault = a.startsWith('*');
+                        const bIsDefault = b.startsWith('*');
+                        if (aIsDefault && !bIsDefault)
+                            return -1;
+                        if (!aIsDefault && bIsDefault)
+                            return 1;
+                        return 0;
+                    });
+                    return {
+                        results: sortedModels.map(model => {
+                            const isDefault = model.startsWith('*');
+                            const modelName = model.replace(/^\*/, '');
+                            return {
+                                name: isDefault ? `${modelName} (default)` : modelName,
+                                value: modelName,
+                            };
+                        }),
+                    };
+                },
+            },
+        };
     }
     async supplyData(itemIndex) {
         var _a, _b;
         this.logger.info('=== supplyData called for Azure OpenAI Chat Model (MS OAuth2) v1.5.3 ===');
-        const deploymentName = this.getNodeParameter('deploymentName', itemIndex);
+        const deploymentNameParam = this.getNodeParameter('deploymentName', itemIndex);
+        const deploymentName = typeof deploymentNameParam === 'string'
+            ? deploymentNameParam
+            : deploymentNameParam.value;
         const options = this.getNodeParameter('options', itemIndex, {});
         const getCredentialsWithFreshToken = async () => {
             const credentials = await this.getCredentials('azureOpenAiMsOAuth2Api');
