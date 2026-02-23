@@ -239,6 +239,12 @@ export class LmEmbeddingAzureOpenAiMsOAuth2SubNode implements INodeType {
 			azureOpenAIApiVersion: apiVersion,
 			// Use azureOpenAIBasePath for custom endpoint (APIM gateway)
 			azureOpenAIBasePath: `${endpoint}/openai/deployments`,
+			configuration: {
+				defaultHeaders: {
+					'api-key': accessToken,
+					'Authorization': `Bearer ${accessToken}`,
+				},
+			},
 			...options,
 		});
 
