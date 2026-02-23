@@ -338,7 +338,9 @@ class LmChatAzureOpenAiMsOAuth2 {
             };
         };
         const initialCreds = await getCredentialsWithFreshToken();
+        const timeout = (_a = options.timeout) !== null && _a !== void 0 ? _a : 60000;
         const model = new openai_1.AzureChatOpenAI({
+            model: deploymentName,
             azureOpenAIApiDeploymentName: deploymentName,
             azureOpenAIApiKey: initialCreds.accessToken,
             azureOpenAIEndpoint: initialCreds.endpoint,
@@ -348,15 +350,15 @@ class LmChatAzureOpenAiMsOAuth2 {
             topP: options.topP,
             frequencyPenalty: options.frequencyPenalty,
             presencePenalty: options.presencePenalty,
-            timeout: (_a = options.timeout) !== null && _a !== void 0 ? _a : 60000,
+            timeout,
             maxRetries: (_b = options.maxRetries) !== null && _b !== void 0 ? _b : 2,
             modelKwargs: options.responseFormat
                 ? {
                     response_format: { type: options.responseFormat },
                 }
                 : undefined,
+            streaming: false,
             callbacks: [new N8nLlmTracing_1.N8nLlmTracing(this)],
-            streamUsage: true,
         });
         return {
             response: model,
