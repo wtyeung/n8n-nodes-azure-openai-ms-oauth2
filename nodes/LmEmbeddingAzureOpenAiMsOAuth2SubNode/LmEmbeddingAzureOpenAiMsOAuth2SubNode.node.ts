@@ -1,4 +1,5 @@
 import { AzureOpenAIEmbeddings } from '@langchain/openai';
+import { logWrapper } from '@n8n/ai-utilities';
 import {
 	NodeConnectionTypes,
 	NodeOperationError,
@@ -249,7 +250,7 @@ export class LmEmbeddingAzureOpenAiMsOAuth2SubNode implements INodeType {
 		});
 
 		return {
-			response: embeddings,
+			response: logWrapper(embeddings as any, this),
 		};
 	}
 }

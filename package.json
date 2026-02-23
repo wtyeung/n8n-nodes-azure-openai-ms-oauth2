@@ -44,6 +44,7 @@
     ]
   },
   "devDependencies": {
+    "@n8n/ai-utilities": "*",
     "@n8n/node-cli": "*",
     "@types/lodash": "^4.17.21",
     "@types/node": "^20.10.0",
@@ -54,6 +55,7 @@
   },
   "peerDependencies": {
     "@langchain/openai": ">=0.3.0",
+    "@n8n/ai-utilities": "*",
     "langchain": ">=0.3.0",
     "n8n-workflow": "*"
   },
