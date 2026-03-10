@@ -10,12 +10,6 @@ class AzureOpenAiMsOAuth2Api {
         this.icon = 'file:azure-openai.svg';
         this.properties = [
             {
-                displayName: 'Scope',
-                name: 'scope',
-                type: 'hidden',
-                default: '={{$self.apiScope.includes("offline_access") ? $self.apiScope : "offline_access " + $self.apiScope}}',
-            },
-            {
                 displayName: 'API Scope',
                 name: 'apiScope',
                 type: 'string',
@@ -23,6 +17,42 @@ class AzureOpenAiMsOAuth2Api {
                 default: 'api://REPLACE-WITH-YOUR-APP-ID/.default',
                 placeholder: 'api://12345678-1234-1234-1234-123456789abc/.default',
                 description: '⚠️ REQUIRED: Enter your Azure AD application scope. Format: api://<your-app-id>/.default. Note: offline_access is automatically added for token refresh.',
+                noDataExpression: true,
+            },
+            {
+                displayName: 'Scope',
+                name: 'scope',
+                type: 'hidden',
+                default: '={{$self.apiScope.includes("offline_access") ? $self.apiScope : "offline_access " + $self.apiScope}}',
+            },
+            {
+                displayName: 'Grant Type',
+                name: 'grantType',
+                type: 'hidden',
+                default: 'authorizationCode',
+                noDataExpression: true,
+            },
+            {
+                displayName: 'Authorization URL',
+                name: 'authUrl',
+                type: 'hidden',
+                default: 'https://login.microsoftonline.com/common/oauth2/v2.0/authorize',
+                required: true,
+                noDataExpression: true,
+            },
+            {
+                displayName: 'Access Token URL',
+                name: 'accessTokenUrl',
+                type: 'hidden',
+                default: 'https://login.microsoftonline.com/common/oauth2/v2.0/token',
+                required: true,
+                noDataExpression: true,
+            },
+            {
+                displayName: 'Authentication',
+                name: 'authentication',
+                type: 'hidden',
+                default: 'body',
                 noDataExpression: true,
             },
             {
