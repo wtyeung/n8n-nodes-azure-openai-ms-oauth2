@@ -100,6 +100,63 @@ export class LmEmbeddingAzureOpenAiMsOAuth2 implements INodeType {
 				const credentials = await this.getCredentials('azureOpenAiMsOAuth2Api');
 				const endpoint = credentials.endpoint as string;
 				const apiVersion = credentials.apiVersion as string;
+				let oauthData = credentials.oauthTokenData as any;
+				
+				if (!oauthData?.access_token) {
+					throw new Error('No access token available in credentials');
+				}
+
+				// Check if token is expired or about to expire
+				let accessToken = oauthData.access_token;
+				const now = Math.floor(Date.now() / 1000);
+				let isExpired = false;
+
+				// Check expiry from various possible fields
+				if (oauthData.expires_at) {
+					isExpired = now >= oauthData.expires_at;
+				} else if (oauthData.exp) {
+					isExpired = now >= oauthData.exp;
+				} else {
+					// Try to decode JWT to get exp claim
+					try {
+						const parts = accessToken.split('.');
+						if (parts.length === 3) {
+							const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString('utf8'));
+							if (payload.exp) {
+								isExpired = now >= payload.exp;
+							}
+						}
+					} catch (e) {
+						// If we can't decode, assume not expired and let the API call handle it
+					}
+				}
+
+				// If token is expired, trigger refresh by making a test request
+				if (isExpired) {
+					try {
+						// Make a test request that will trigger n8n's OAuth2 refresh on 401
+						await this.helpers.httpRequestWithAuthentication.call(
+							this,
+							'azureOpenAiMsOAuth2Api',
+							{
+								method: 'GET',
+								url: `${endpoint}openai/deployments?api-version=${apiVersion}`,
+								json: true,
+							},
+						);
+
+						// Get the refreshed credentials
+						const refreshedCredentials = await this.getCredentials('azureOpenAiMsOAuth2Api');
+						oauthData = refreshedCredentials.oauthTokenData as any;
+						accessToken = oauthData?.access_token;
+
+						if (!accessToken) {
+							throw new Error('Failed to refresh access token');
+						}
+					} catch (error) {
+						// If refresh fails, continue with existing token and let the main request handle it
+					}
+				}
 
 				const url = `${endpoint}openai/deployments/${deploymentName}/embeddings?api-version=${apiVersion}`;
 
@@ -115,13 +172,18 @@ export class LmEmbeddingAzureOpenAiMsOAuth2 implements INodeType {
 					body.encoding_format = options.encoding_format;
 				}
 
-				// Use httpRequestWithAuthentication for automatic OAuth2 token refresh
+				// Explicitly add both api-key and Authorization headers
+				// api-key is required for APIM, Authorization is standard OAuth2
 				const response = await this.helpers.httpRequestWithAuthentication.call(
 					this,
 					'azureOpenAiMsOAuth2Api',
 					{
 						method: 'POST',
 						url,
+						headers: {
+							'api-key': accessToken,
+							'Authorization': `Bearer ${accessToken}`,
+						},
 						body,
 						json: true,
 					},
