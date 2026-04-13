@@ -24,12 +24,6 @@ export class LmEmbeddingAzureOpenAiMsOAuth2 implements INodeType {
 		],
 		requestDefaults: {
 			baseURL: '={{$credentials.endpoint}}',
-			headers: {
-				Accept: 'application/json',
-				'Content-Type': 'application/json',
-				'api-key': '={{$credentials.oauthTokenData.access_token}}',
-				Authorization: '=Bearer {{$credentials.oauthTokenData.access_token}}',
-			},
 		},
 		properties: [
 			{

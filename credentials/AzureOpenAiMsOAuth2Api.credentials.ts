@@ -103,6 +103,7 @@ export class AzureOpenAiMsOAuth2Api implements ICredentialType {
 		type: 'generic',
 		properties: {
 			headers: {
+				'api-key': '={{$credentials.oauthTokenData.access_token}}',
 				Authorization: '=Bearer {{$credentials.oauthTokenData.access_token}}',
 			},
 		},
