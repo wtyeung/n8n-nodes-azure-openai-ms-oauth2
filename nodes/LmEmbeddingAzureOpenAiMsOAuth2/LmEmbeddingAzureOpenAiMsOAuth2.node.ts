@@ -1,4 +1,9 @@
-import type { INodeType, INodeTypeDescription } from 'n8n-workflow';
+import type {
+	IExecuteFunctions,
+	INodeExecutionData,
+	INodeType,
+	INodeTypeDescription,
+} from 'n8n-workflow';
 import { NodeConnectionTypes } from 'n8n-workflow';
 
 export class LmEmbeddingAzureOpenAiMsOAuth2 implements INodeType {
@@ -22,9 +27,6 @@ export class LmEmbeddingAzureOpenAiMsOAuth2 implements INodeType {
 				required: true,
 			},
 		],
-		requestDefaults: {
-			baseURL: '={{$credentials.endpoint}}',
-		},
 		properties: [
 			{
 				displayName: 'Deployment Name',
@@ -45,28 +47,6 @@ export class LmEmbeddingAzureOpenAiMsOAuth2 implements INodeType {
 				typeOptions: {
 					rows: 4,
 				},
-				routing: {
-					request: {
-						method: 'POST',
-						url: '=/openai/deployments/{{$parameter.deploymentName}}/embeddings',
-						qs: {
-							'api-version': '={{$credentials.apiVersion}}',
-						},
-						body: {
-							input: '={{$parameter.text}}',
-						},
-					},
-					output: {
-						postReceive: [
-							{
-								type: 'rootProperty',
-								properties: {
-									property: 'data',
-								},
-							},
-						],
-					},
-				},
 			},
 			{
 				displayName: 'Options',
@@ -81,12 +61,6 @@ export class LmEmbeddingAzureOpenAiMsOAuth2 implements INodeType {
 						type: 'number',
 						default: 1536,
 						description: 'The number of dimensions the resulting output embeddings should have. Only supported in text-embedding-3 and later models. Default: 1536 for text-embedding-3-small, 3072 for text-embedding-3-large.',
-						routing: {
-							send: {
-								type: 'body',
-								property: 'dimensions',
-							},
-						},
 					},
 					{
 						displayName: 'Encoding Format',
@@ -104,15 +78,78 @@ export class LmEmbeddingAzureOpenAiMsOAuth2 implements INodeType {
 						],
 						default: 'float',
 						description: 'The format to return the embeddings in',
-						routing: {
-							send: {
-								type: 'body',
-								property: 'encoding_format',
-							},
-						},
 					},
 				],
 			},
 		],
 	};
+
+	async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
+		const items = this.getInputData();
+		const returnData: INodeExecutionData[] = [];
+
+		for (let itemIndex = 0; itemIndex < items.length; itemIndex++) {
+			try {
+				const deploymentName = this.getNodeParameter('deploymentName', itemIndex) as string;
+				const text = this.getNodeParameter('text', itemIndex) as string;
+				const options = this.getNodeParameter('options', itemIndex, {}) as {
+					dimensions?: number;
+					encoding_format?: string;
+				};
+
+				const credentials = await this.getCredentials('azureOpenAiMsOAuth2Api');
+				const endpoint = credentials.endpoint as string;
+				const apiVersion = credentials.apiVersion as string;
+
+				const url = `${endpoint}openai/deployments/${deploymentName}/embeddings?api-version=${apiVersion}`;
+
+				const body: any = {
+					input: text,
+				};
+
+				if (options.dimensions) {
+					body.dimensions = options.dimensions;
+				}
+
+				if (options.encoding_format) {
+					body.encoding_format = options.encoding_format;
+				}
+
+				// Use httpRequestWithAuthentication for automatic OAuth2 token refresh
+				const response = await this.helpers.httpRequestWithAuthentication.call(
+					this,
+					'azureOpenAiMsOAuth2Api',
+					{
+						method: 'POST',
+						url,
+						body,
+						json: true,
+					},
+				);
+
+				// Extract embeddings from response
+				const embeddings = response.data || [];
+
+				for (const embedding of embeddings) {
+					returnData.push({
+						json: embedding,
+						pairedItem: { item: itemIndex },
+					});
+				}
+			} catch (error) {
+				if (this.continueOnFail()) {
+					returnData.push({
+						json: {
+							error: (error as Error).message,
+						},
+						pairedItem: { item: itemIndex },
+					});
+					continue;
+				}
+				throw error;
+			}
+		}
+
+		return [returnData];
+	}
 }
