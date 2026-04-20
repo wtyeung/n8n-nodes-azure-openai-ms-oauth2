@@ -110,11 +110,14 @@ export class LmEmbeddingAzureOpenAiMsOAuth2 implements INodeType {
 				let accessToken = oauthData.access_token;
 				const now = Math.floor(Date.now() / 1000);
 				let isExpired = false;
+				let expiryTime: number | undefined;
 
 				// Check expiry from various possible fields
 				if (oauthData.expires_at) {
+					expiryTime = oauthData.expires_at;
 					isExpired = now >= oauthData.expires_at;
 				} else if (oauthData.exp) {
+					expiryTime = oauthData.exp;
 					isExpired = now >= oauthData.exp;
 				} else {
 					// Try to decode JWT to get exp claim
@@ -123,17 +126,32 @@ export class LmEmbeddingAzureOpenAiMsOAuth2 implements INodeType {
 						if (parts.length === 3) {
 							const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString('utf8'));
 							if (payload.exp) {
+								expiryTime = payload.exp;
 								isExpired = now >= payload.exp;
 							}
 						}
 					} catch (e) {
 						// If we can't decode, assume not expired and let the API call handle it
+						this.logger.debug('Could not decode JWT to check expiry, will rely on API 401 handling');
+					}
+				}
+
+				if (expiryTime) {
+					const timeUntilExpiry = expiryTime - now;
+					const minutesUntilExpiry = Math.floor(timeUntilExpiry / 60);
+					
+					if (isExpired) {
+						this.logger.info(`Token expired ${Math.abs(minutesUntilExpiry)} minutes ago, triggering refresh...`);
+					} else {
+						this.logger.debug(`Token valid for ${minutesUntilExpiry} more minutes`);
 					}
 				}
 
 				// If token is expired, trigger refresh by making a test request
 				if (isExpired) {
 					try {
+						this.logger.info('Making test request to trigger OAuth2 token refresh...');
+						
 						// Make a test request that will trigger n8n's OAuth2 refresh on 401
 						await this.helpers.httpRequestWithAuthentication.call(
 							this,
@@ -148,12 +166,18 @@ export class LmEmbeddingAzureOpenAiMsOAuth2 implements INodeType {
 						// Get the refreshed credentials
 						const refreshedCredentials = await this.getCredentials('azureOpenAiMsOAuth2Api');
 						oauthData = refreshedCredentials.oauthTokenData as any;
-						accessToken = oauthData?.access_token;
+						const newAccessToken = oauthData?.access_token;
 
-						if (!accessToken) {
+						if (!newAccessToken) {
 							throw new Error('Failed to refresh access token');
 						}
+
+						const tokenChanged = newAccessToken !== accessToken;
+						accessToken = newAccessToken;
+						
+						this.logger.info(`Token refresh ${tokenChanged ? 'successful - new token received' : 'completed - token unchanged'}`);
 					} catch (error) {
+						this.logger.warn(`Token refresh failed: ${(error as Error).message}, will attempt with existing token`);
 						// If refresh fails, continue with existing token and let the main request handle it
 					}
 				}
