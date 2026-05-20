@@ -41,7 +41,8 @@
     "nodes": [
       "dist/nodes/LmChatAzureOpenAiMsOAuth2/LmChatAzureOpenAiMsOAuth2.node.js",
       "dist/nodes/LmEmbeddingAzureOpenAiMsOAuth2/LmEmbeddingAzureOpenAiMsOAuth2.node.js",
-      "dist/nodes/LmEmbeddingAzureOpenAiMsOAuth2SubNode/LmEmbeddingAzureOpenAiMsOAuth2SubNode.node.js"
+      "dist/nodes/LmEmbeddingAzureOpenAiMsOAuth2SubNode/LmEmbeddingAzureOpenAiMsOAuth2SubNode.node.js",
+      "dist/nodes/AzureOpenAiResponse/AzureOpenAiResponse.node.js"
     ]
   },
   "devDependencies": {
