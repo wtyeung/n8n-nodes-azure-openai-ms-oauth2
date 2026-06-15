@@ -7,8 +7,6 @@ import type {
 	SupplyData,
 } from 'n8n-workflow';
 import { NodeConnectionTypes, NodeOperationError } from 'n8n-workflow';
-import { AzureChatOpenAI } from '@langchain/openai';
-import { N8nLlmTracing } from './N8nLlmTracing';
 
 interface OAuthTokenData {
 	access_token?: string;
@@ -542,6 +540,11 @@ export class LmChatAzureOpenAiMsOAuth2 implements INodeType {
 
 		// Get initial credentials with fresh token
 		const initialCreds = await getCredentialsWithFreshToken();
+
+		// Dynamic imports prevent silent node unloading when @langchain packages
+		// are not resolvable at module load time on some workers in queue mode
+		const { AzureChatOpenAI } = await import('@langchain/openai');
+		const { N8nLlmTracing } = await import('./N8nLlmTracing');
 
 		// Create model with fresh token
 		// Token refresh happens in getCurrentToken() which is called by getCredentialsWithFreshToken()
