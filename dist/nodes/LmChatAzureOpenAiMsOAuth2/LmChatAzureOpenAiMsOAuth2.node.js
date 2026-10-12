@@ -99,7 +99,7 @@ class LmChatAzureOpenAiMsOAuth2 {
                         })()
                     },
                     required: true,
-                    description: 'The deployment name configured in your Azure OpenAI resource. Mark default with * in AZURE_OPENAI_MODELS (e.g., "*gpt-4o,gpt-4,gpt-35-turbo")',
+                    description: 'The deployment name configured in your Azure OpenAI resource. Mark default with * in AZURE_OPENAI_MODELS (e.g., "*gpt-4o,gpt-4,gpt-35-turbo").',
                     modes: [
                         {
                             displayName: 'From List',

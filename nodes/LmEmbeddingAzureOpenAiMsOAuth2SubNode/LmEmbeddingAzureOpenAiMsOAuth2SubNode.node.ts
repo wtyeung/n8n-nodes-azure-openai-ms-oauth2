@@ -119,6 +119,7 @@ export class LmEmbeddingAzureOpenAiMsOAuth2SubNode implements INodeType {
 				],
 			},
 		],
+		usableAsTool: true,
 	};
 
 	async supplyData(this: ISupplyDataFunctions, itemIndex: number): Promise<SupplyData> {
@@ -159,6 +160,10 @@ export class LmEmbeddingAzureOpenAiMsOAuth2SubNode implements INodeType {
 		});
 
 		return {
+			// `embeddings` satisfies logWrapper's Embeddings constraint structurally, but the
+			// @langchain/core version resolved here differs from the one @n8n/ai-utilities'
+			// type declarations expect, so TS sees them as incompatible nominal types.
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			response: logWrapper(embeddings as any, this),
 		};
 	}

@@ -104,7 +104,7 @@ export class LmEmbeddingAzureOpenAiMsOAuth2 implements INodeType {
 
 				const url = `${auth.endpoint}openai/deployments/${deploymentName}/embeddings?api-version=${auth.apiVersion}`;
 
-				const body: any = {
+				const body: Record<string, unknown> = {
 					input: text,
 				};
 

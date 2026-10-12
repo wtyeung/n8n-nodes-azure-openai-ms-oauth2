@@ -69,6 +69,7 @@ export class LmChatAzureOpenAiMsOAuth2 implements INodeType {
 					mode: 'list', 
 					value: (() => {
 						// Extract default from AZURE_OPENAI_MODELS (model with * prefix)
+						// eslint-disable-next-line @n8n/community-nodes/no-restricted-globals
 						const modelsEnv = process.env.AZURE_OPENAI_MODELS || '*gpt-4o,gpt-4,gpt-35-turbo';
 						const defaultModel = modelsEnv.split(',')
 							.map(m => m.trim())
@@ -77,7 +78,7 @@ export class LmChatAzureOpenAiMsOAuth2 implements INodeType {
 					})()
 				},
 				required: true,
-				description: 'The deployment name configured in your Azure OpenAI resource. Mark default with * in AZURE_OPENAI_MODELS (e.g., "*gpt-4o,gpt-4,gpt-35-turbo")',
+				description: 'The deployment name configured in your Azure OpenAI resource. Mark default with * in AZURE_OPENAI_MODELS (e.g., "*gpt-4o,gpt-4,gpt-35-turbo").',
 				modes: [
 					{
 						displayName: 'From List',
@@ -208,6 +209,7 @@ export class LmChatAzureOpenAiMsOAuth2 implements INodeType {
 			): Promise<INodeListSearchResult> {
 				// Read from environment variables
 				// Format: "model1,*model2,model3" where * marks the default
+				// eslint-disable-next-line @n8n/community-nodes/no-restricted-globals
 				const modelsEnv = process.env.AZURE_OPENAI_MODELS || '*gpt-4o,gpt-4,gpt-35-turbo';
 				const models = modelsEnv.split(',').map(m => m.trim()).filter(m => m.length > 0);
 				

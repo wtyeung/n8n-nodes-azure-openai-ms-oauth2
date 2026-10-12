@@ -39,13 +39,14 @@ export class AzureOpenAiResponse implements INodeType {
 				default: {
 					mode: 'list',
 					value: (() => {
+						// eslint-disable-next-line @n8n/community-nodes/no-restricted-globals
 						const modelsEnv = process.env.AZURE_OPENAI_MODELS || '*gpt-4o,gpt-4,gpt-35-turbo';
 						const defaultModel = modelsEnv.split(',').map(m => m.trim()).find(m => m.startsWith('*'));
 						return defaultModel ? defaultModel.replace(/^\*/, '') : '';
 					})(),
 				},
 				required: true,
-				description: 'The model deployment name. Mark default with * in AZURE_OPENAI_MODELS env var (e.g. "*gpt-4o,gpt-4.1,gpt-5.5")',
+				description: 'The model deployment name. Mark default with * in AZURE_OPENAI_MODELS env var (e.g. "*gpt-4o,gpt-4.1,gpt-5.5").',
 				displayOptions: {
 					hide: {
 						inputMode: ['rawJson'],
@@ -140,12 +141,42 @@ export class AzureOpenAiResponse implements INodeType {
 						displayName: 'Content Item',
 						values: [
 							{
-								displayName: 'Type',
-								name: 'type',
-								type: 'options',
-								default: 'input_text',
-								noDataExpression: false,
-								options: [
+						displayName: 'Binary Property',
+						name: 'binaryProperty',
+						type: 'string',
+						default: 'data',
+						description: 'Name of the binary property in the input item that contains the image or file data',
+							},
+							{
+						displayName: 'Filename',
+						name: 'filename',
+						type: 'string',
+						default: '',
+						placeholder: 'Leave empty to use filename from binary data',
+						description: 'Filename to send to the API. If left empty, uses the filename from the binary object.',
+							},
+							{
+						displayName: 'Image URL',
+						name: 'imageUrl',
+						type: 'string',
+						default: '',
+						description: 'The URL of the image to send',
+						placeholder: 'https://example.com/image.png',
+							},
+							{
+						displayName: 'Text',
+						name: 'text',
+						type: 'string',
+						default: '',
+						description: 'The text content to send',
+							},
+							{
+						displayName: 'Type',
+						name: 'type',
+						type: 'options',
+						default: 'input_text',
+							noDataExpression:	false,
+						options: [
 									{
 										name: 'Text',
 										value: 'input_text',
@@ -162,66 +193,13 @@ export class AzureOpenAiResponse implements INodeType {
 										description: 'Image from n8n binary data (PNG, JPEG, WEBP)',
 									},
 									{
-										name: 'File / PDF (Binary)',
+										name: 'File	/	PDF (Binary)',
 										value: 'input_file_binary',
 										description: 'PDF or file from n8n binary data',
 									},
-								],
+								]
 							},
-							{
-								displayName: 'Text',
-								name: 'text',
-								type: 'string',
-								default: '',
-								description: 'The text content to send',
-								typeOptions: {
-									rows: 3,
-								},
-								displayOptions: {
-									show: {
-										type: ['input_text'],
-									},
-								},
-							},
-							{
-								displayName: 'Image URL',
-								name: 'imageUrl',
-								type: 'string',
-								default: '',
-								description: 'The URL of the image to send',
-								placeholder: 'https://example.com/image.png',
-								displayOptions: {
-									show: {
-										type: ['input_image_url'],
-									},
-								},
-							},
-							{
-								displayName: 'Binary Property',
-								name: 'binaryProperty',
-								type: 'string',
-								default: 'data',
-								description: 'Name of the binary property in the input item that contains the image or file data',
-								displayOptions: {
-									show: {
-										type: ['input_image_binary', 'input_file_binary'],
-									},
-								},
-							},
-							{
-								displayName: 'Filename',
-								name: 'filename',
-								type: 'string',
-								default: '',
-								placeholder: 'Leave empty to use filename from binary data',
-								description: 'Filename to send to the API. If left empty, uses the filename from the binary object.',
-								displayOptions: {
-									show: {
-										type: ['input_file_binary'],
-									},
-								},
-							},
-						],
+					],
 					},
 				],
 			},
@@ -294,7 +272,7 @@ export class AzureOpenAiResponse implements INodeType {
 							{
 								name: 'JSON Object',
 								value: 'json_object',
-								description: 'Forces the model to return valid JSON. Include "json" in your instructions.',
+								description: 'Forces the model to return valid JSON. Include "JSON" in your instructions.',
 							},
 						],
 					},
@@ -336,6 +314,7 @@ export class AzureOpenAiResponse implements INodeType {
 				this: ILoadOptionsFunctions,
 				filter?: string,
 			): Promise<INodeListSearchResult> {
+				// eslint-disable-next-line @n8n/community-nodes/no-restricted-globals
 				const modelsEnv = process.env.AZURE_OPENAI_MODELS || '*gpt-4o,gpt-4,gpt-35-turbo';
 				const models = modelsEnv.split(',').map(m => m.trim()).filter(m => m.length > 0);
 				const filteredModels = filter
