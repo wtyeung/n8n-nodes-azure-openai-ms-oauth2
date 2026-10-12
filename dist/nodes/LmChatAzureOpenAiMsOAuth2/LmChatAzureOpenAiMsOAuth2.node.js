@@ -280,6 +280,7 @@ class LmChatAzureOpenAiMsOAuth2 {
                 }
                 : undefined,
             streaming: false,
+            useResponsesApi: false,
             callbacks: [new N8nLlmTracing(this)],
         });
         return {

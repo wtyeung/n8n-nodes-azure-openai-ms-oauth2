@@ -293,8 +293,16 @@ export class LmChatAzureOpenAiMsOAuth2 implements INodeType {
 					}
 				: undefined,
 			streaming: false,
+			// Force Chat Completions API regardless of model name heuristics. Newer
+			// @langchain/openai versions auto-detect certain model families (e.g. GPT-5 /
+			// reasoning models) and silently switch to the Responses API, which uses a
+			// different URL shape ("openai/responses") than our deployment-based Azure
+			// OpenAI endpoint ("openai/deployments/{name}/chat/completions"), causing a
+			// 404 Resource not found error for deployment names not explicitly handled.
+			useResponsesApi: false,
 			callbacks: [new N8nLlmTracing(this)],
-		});
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		} as any);
 
 		return {
 			response: model,
