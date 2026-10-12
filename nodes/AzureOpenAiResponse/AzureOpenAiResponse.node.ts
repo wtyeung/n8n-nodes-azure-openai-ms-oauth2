@@ -7,6 +7,7 @@ import type {
 	INodeTypeDescription,
 } from 'n8n-workflow';
 import { NodeConnectionTypes, NodeOperationError } from 'n8n-workflow';
+import { azureAuthenticationProperty, azureCredentialsDescriptor } from '../shared/azureOpenAiAuth';
 
 type ContentItem =
 	| { type: 'input_text'; text: string }
@@ -28,13 +29,9 @@ export class AzureOpenAiResponse implements INodeType {
 		usableAsTool: true,
 		inputs: [NodeConnectionTypes.Main],
 		outputs: [NodeConnectionTypes.Main],
-		credentials: [
-			{
-				name: 'azureOpenAiMsOAuth2Api',
-				required: true,
-			},
-		],
+		credentials: azureCredentialsDescriptor,
 		properties: [
+			azureAuthenticationProperty,
 			{
 				displayName: 'Model',
 				name: 'model',
@@ -379,7 +376,9 @@ export class AzureOpenAiResponse implements INodeType {
 					previousResponseId?: string;
 				};
 
-				const credentials = await this.getCredentials('azureOpenAiMsOAuth2Api');
+				const authentication = this.getNodeParameter('authentication', itemIndex, 'oAuth2') as 'apiKey' | 'oAuth2';
+				const credentialName = authentication === 'apiKey' ? 'azureOpenAiApiKeyApi' : 'azureOpenAiMsOAuth2Api';
+				const credentials = await this.getCredentials(credentialName);
 				const endpoint = credentials.endpoint as string;
 				const apiVersion = credentials.apiVersion as string;
 
@@ -433,7 +432,7 @@ export class AzureOpenAiResponse implements INodeType {
 
 					const rawResponse = await this.helpers.httpRequestWithAuthentication.call(
 						this,
-						'azureOpenAiMsOAuth2Api',
+						credentialName,
 						{
 							method: 'POST',
 							url: rawUrl,
@@ -592,7 +591,7 @@ export class AzureOpenAiResponse implements INodeType {
 
 				const response = await this.helpers.httpRequestWithAuthentication.call(
 					this,
-					'azureOpenAiMsOAuth2Api',
+					credentialName,
 					{
 						method: 'POST',
 						url,

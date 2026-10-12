@@ -2,108 +2,23 @@ import { AzureOpenAIEmbeddings } from '@langchain/openai';
 import { logWrapper } from '@n8n/ai-utilities';
 import {
 	NodeConnectionTypes,
-	NodeOperationError,
 	type INodeType,
 	type INodeTypeDescription,
 	type ISupplyDataFunctions,
 	type SupplyData,
 } from 'n8n-workflow';
-
-async function getCurrentToken(
-	context: ISupplyDataFunctions,
-	deploymentName?: string,
-): Promise<string> {
-	const credentials = await context.getCredentials('azureOpenAiMsOAuth2Api');
-	
-	const oauthTokenData = credentials.oauthTokenData as {
-		access_token?: string;
-		expires_in?: number;
-		expires_at?: number;
-		exp?: number;
-		refresh_token?: string;
-	};
-
-	if (!oauthTokenData?.access_token) {
-		throw new NodeOperationError(
-			context.getNode(),
-			'No access token found in credentials. Please reconnect your Azure OpenAI MS OAuth2 credential.',
-		);
-	}
-
-	const accessToken = oauthTokenData.access_token;
-
-	// Decode JWT to get expiry
-	function decodeJWT(token: string): { exp?: number } | null {
-		try {
-			const parts = token.split('.');
-			if (parts.length !== 3) return null;
-			const payload = parts[1];
-			const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
-			const jsonPayload = Buffer.from(base64, 'base64').toString('utf8');
-			return JSON.parse(jsonPayload);
-		} catch {
-			return null;
-		}
-	}
-
-	const decoded = decodeJWT(accessToken);
-	const credentialBufferTime = (credentials.refreshBeforeExpirySeconds as number | undefined) ?? 900;
-
-	if (decoded?.exp) {
-		const expiryTime = decoded.exp * 1000;
-		const now = Date.now();
-		const timeUntilExpiry = expiryTime - now;
-		const bufferMs = credentialBufferTime * 1000;
-
-		if (timeUntilExpiry < bufferMs) {
-			context.logger.warn(
-				`Token expires in ${Math.round(timeUntilExpiry / 1000 / 60)} minutes, triggering refresh (buffer: ${credentialBufferTime}s)`,
-			);
-
-			if (timeUntilExpiry <= 0) {
-				// Token already expired - use HTTP request to force n8n OAuth2 refresh
-				try {
-					const testUrl = `${credentials.endpoint}openai/deployments/${deploymentName || 'test'}/embeddings?api-version=${credentials.apiVersion}`;
-					await context.helpers.httpRequestWithAuthentication.call(
-						context,
-						'azureOpenAiMsOAuth2Api',
-						{
-							method: 'POST',
-							url: testUrl,
-							body: { input: 'test' },
-							skipSslCertificateValidation: true,
-							ignoreHttpStatusErrors: true,
-						},
-					);
-
-					const refreshedCredentials = await context.getCredentials('azureOpenAiMsOAuth2Api');
-					const refreshedTokenData = refreshedCredentials.oauthTokenData as typeof oauthTokenData;
-					
-					if (refreshedTokenData?.access_token && refreshedTokenData.access_token !== accessToken) {
-						context.logger.info('✅ SUCCESS: Token refreshed via HTTP request (n8n OAuth2)');
-						return refreshedTokenData.access_token;
-					}
-				} catch (error) {
-					context.logger.error('Failed to refresh token via HTTP request', error);
-				}
-			}
-		}
-	}
-
-	return accessToken;
-}
+import {
+	azureAuthenticationProperty,
+	azureCredentialsDescriptor,
+	resolveAzureOpenAiAuth,
+} from '../shared/azureOpenAiAuth';
 
 export class LmEmbeddingAzureOpenAiMsOAuth2SubNode implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'Embeddings Azure OpenAI (MS OAuth2)',
 		name: 'lmEmbeddingAzureOpenAiMsOAuth2SubNode',
 		icon: 'file:azure-openai.svg',
-		credentials: [
-			{
-				name: 'azureOpenAiMsOAuth2Api',
-				required: true,
-			},
-		],
+		credentials: azureCredentialsDescriptor,
 		group: ['transform'],
 		version: 1,
 		description: 'Use Azure OpenAI Embeddings with Microsoft OAuth2 authentication',
@@ -130,6 +45,7 @@ export class LmEmbeddingAzureOpenAiMsOAuth2SubNode implements INodeType {
 		outputNames: ['Embeddings'],
 		
 		properties: [
+			azureAuthenticationProperty,
 			{
 				displayName: 'Model (Deployment) Name',
 				name: 'model',
@@ -206,9 +122,8 @@ export class LmEmbeddingAzureOpenAiMsOAuth2SubNode implements INodeType {
 	};
 
 	async supplyData(this: ISupplyDataFunctions, itemIndex: number): Promise<SupplyData> {
-		this.logger.debug('Supply data for Azure OpenAI embeddings with MS OAuth2');
-		
-		const credentials = await this.getCredentials('azureOpenAiMsOAuth2Api');
+		this.logger.debug('Supply data for Azure OpenAI embeddings');
+
 		const modelName = this.getNodeParameter('model', itemIndex) as string;
 
 		const options = this.getNodeParameter('options', itemIndex, {}) as {
@@ -222,29 +137,23 @@ export class LmEmbeddingAzureOpenAiMsOAuth2SubNode implements INodeType {
 			options.timeout = undefined;
 		}
 
-		if (!credentials.endpoint) {
-			throw new NodeOperationError(
-				this.getNode(),
-				'Endpoint is required in credentials',
-			);
-		}
+		// Resolve endpoint/apiVersion/token based on the selected authentication method.
+		// For OAuth2 this also handles proactive token refresh.
+		const auth = await resolveAzureOpenAiAuth(this, itemIndex, modelName);
 
-		// Get fresh OAuth2 token
-		const accessToken = await getCurrentToken(this, modelName);
-		const endpoint = (credentials.endpoint as string).replace(/\/$/, '');
-		const apiVersion = credentials.apiVersion as string;
+		const defaultHeaders: Record<string, string> =
+			auth.authentication === 'apiKey'
+				? { 'api-key': auth.token }
+				: { 'api-key': auth.token, Authorization: `Bearer ${auth.token}` };
 
 		const embeddings = new AzureOpenAIEmbeddings({
 			azureOpenAIApiDeploymentName: modelName,
-			azureOpenAIApiKey: accessToken, // OAuth2 token passed as API key for APIM
-			azureOpenAIApiVersion: apiVersion,
+			azureOpenAIApiKey: auth.token, // API key, or OAuth2 token passed as API key for APIM
+			azureOpenAIApiVersion: auth.apiVersion,
 			// Use azureOpenAIBasePath for custom endpoint (APIM gateway)
-			azureOpenAIBasePath: `${endpoint}/openai/deployments`,
+			azureOpenAIBasePath: `${auth.endpoint}/openai/deployments`,
 			configuration: {
-				defaultHeaders: {
-					'api-key': accessToken,
-					'Authorization': `Bearer ${accessToken}`,
-				},
+				defaultHeaders,
 			},
 			...options,
 		});

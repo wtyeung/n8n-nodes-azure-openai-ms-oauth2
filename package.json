@@ -36,7 +36,8 @@
   "n8n": {
     "n8nNodesApiVersion": 1,
     "credentials": [
-      "dist/credentials/AzureOpenAiMsOAuth2Api.credentials.js"
+      "dist/credentials/AzureOpenAiMsOAuth2Api.credentials.js",
+      "dist/credentials/AzureOpenAiApiKeyApi.credentials.js"
     ],
     "nodes": [
       "dist/nodes/LmChatAzureOpenAiMsOAuth2/LmChatAzureOpenAiMsOAuth2.node.js",
