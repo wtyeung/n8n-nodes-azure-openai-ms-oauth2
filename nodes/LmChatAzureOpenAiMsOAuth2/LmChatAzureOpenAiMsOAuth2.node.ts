@@ -10,12 +10,13 @@ import { NodeConnectionTypes } from 'n8n-workflow';
 import {
 	azureAuthenticationProperty,
 	azureCredentialsDescriptor,
+	packageVersion,
 	resolveAzureOpenAiAuth,
 } from '../shared/azureOpenAiAuth';
 
 export class LmChatAzureOpenAiMsOAuth2 implements INodeType {
 	description: INodeTypeDescription = {
-		displayName: 'Azure OpenAI Chat Model (MS OAuth2)',
+		displayName: `Azure OpenAI Chat Model (MS OAuth2) v${packageVersion}`,
 		name: 'lmChatAzureOpenAiMsOAuth2',
 		icon: 'file:azure-openai.svg',
 		group: ['transform'],
@@ -196,6 +197,14 @@ export class LmChatAzureOpenAiMsOAuth2 implements INodeType {
 							'Controls diversity via nucleus sampling: 0.5 means half of all likelihood-weighted options are considered. We generally recommend altering this or temperature but not both.',
 						type: 'number',
 					},
+					{
+						displayName: 'Use Responses API',
+						name: 'useResponsesApi',
+						default: false,
+						description:
+							'Whether to call the OpenAI Responses API ("openai/responses") instead of Chat Completions ("openai/deployments/{name}/chat/completions"). Off by default to match the classic deployment-based URL that most Azure OpenAI resources and APIM gateways are configured for. Turn this on only for models that require the Responses API (e.g. some newer reasoning models) and whose endpoint/APIM gateway actually supports that route.',
+						type: 'boolean',
+					},
 				],
 			},
 		],
@@ -245,7 +254,7 @@ export class LmChatAzureOpenAiMsOAuth2 implements INodeType {
 	};
 
 	async supplyData(this: ISupplyDataFunctions, itemIndex: number): Promise<SupplyData> {
-		this.logger.info('=== supplyData called for Azure OpenAI Chat Model (MS OAuth2) v1.5.3 ===');
+		this.logger.info(`=== supplyData called for Azure OpenAI Chat Model (MS OAuth2) v${packageVersion} ===`);
 		
 		// Handle resourceLocator format
 		const deploymentNameParam = this.getNodeParameter('deploymentName', itemIndex) as { mode: string; value: string } | string;
@@ -261,6 +270,7 @@ export class LmChatAzureOpenAiMsOAuth2 implements INodeType {
 			timeout?: number;
 			maxRetries?: number;
 			responseFormat?: string;
+			useResponsesApi?: boolean;
 		};
 
 		// Resolve endpoint/apiVersion/token based on the selected authentication method.
@@ -295,13 +305,15 @@ export class LmChatAzureOpenAiMsOAuth2 implements INodeType {
 					}
 				: undefined,
 			streaming: false,
-			// Force Chat Completions API regardless of model name heuristics. Newer
-			// @langchain/openai versions auto-detect certain model families (e.g. GPT-5 /
-			// reasoning models) and silently switch to the Responses API, which uses a
-			// different URL shape ("openai/responses") than our deployment-based Azure
-			// OpenAI endpoint ("openai/deployments/{name}/chat/completions"), causing a
-			// 404 Resource not found error for deployment names not explicitly handled.
-			useResponsesApi: false,
+			// Defaults to Chat Completions ("openai/deployments/{name}/chat/completions"),
+			// matching the classic deployment-based URL most Azure OpenAI resources and APIM
+			// gateways are configured for. Newer @langchain/openai versions auto-detect
+			// certain model families (e.g. GPT-5/reasoning models) and would otherwise
+			// silently switch to the Responses API ("openai/responses"), which uses a
+			// different URL shape and 404s against endpoints that don't support that route.
+			// Some newer reasoning-only models require the Responses API to work at all, so
+			// this is exposed as an option rather than hardcoded.
+			useResponsesApi: options.useResponsesApi ?? false,
 			callbacks: [new N8nLlmTracing(this)],
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		} as any);

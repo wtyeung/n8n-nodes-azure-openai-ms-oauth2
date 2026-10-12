@@ -7,7 +7,7 @@ import type {
 	INodeTypeDescription,
 } from 'n8n-workflow';
 import { NodeConnectionTypes, NodeOperationError } from 'n8n-workflow';
-import { azureAuthenticationProperty, azureCredentialsDescriptor } from '../shared/azureOpenAiAuth';
+import { azureAuthenticationProperty, azureCredentialsDescriptor, packageVersion } from '../shared/azureOpenAiAuth';
 
 type ContentItem =
 	| { type: 'input_text'; text: string }
@@ -16,7 +16,7 @@ type ContentItem =
 
 export class AzureOpenAiResponseMsOAuth2 implements INodeType {
 	description: INodeTypeDescription = {
-		displayName: 'Azure OpenAI Response (MS OAuth2)',
+		displayName: `Azure OpenAI Response (MS OAuth2) v${packageVersion}`,
 		name: 'azureOpenAiResponseMsOAuth2',
 		icon: 'file:azure-openai.svg',
 		group: ['transform'],

@@ -8,12 +8,13 @@ import { NodeConnectionTypes } from 'n8n-workflow';
 import {
 	azureAuthenticationProperty,
 	azureCredentialsDescriptor,
+	packageVersion,
 	resolveAzureOpenAiAuth,
 } from '../shared/azureOpenAiAuth';
 
 export class AzureOpenAiEmbeddingsMsOAuth2 implements INodeType {
 	description: INodeTypeDescription = {
-		displayName: 'Azure OpenAI Embeddings MS OAuth2',
+		displayName: `Azure OpenAI Embeddings MS OAuth2 v${packageVersion}`,
 		name: 'azureOpenAiEmbeddingsMsOAuth2',
 		icon: 'file:azure-openai.svg',
 		group: ['transform'],

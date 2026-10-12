@@ -8,6 +8,21 @@ import { NodeOperationError } from 'n8n-workflow';
 
 type AzureAuthContext = ISupplyDataFunctions | IExecuteFunctions;
 
+/**
+ * The published npm package version, read from package.json at runtime so it
+ * stays in sync automatically instead of being hand-maintained in each node.
+ * Falls back to 'unknown' if package.json can't be resolved for any reason
+ * (e.g. an unusual install layout) so this never breaks node loading.
+ */
+export const packageVersion: string = (() => {
+	try {
+		// eslint-disable-next-line @typescript-eslint/no-require-imports
+		return (require('../../package.json') as { version: string }).version;
+	} catch {
+		return 'unknown';
+	}
+})();
+
 export type AzureAuthenticationMethod = 'apiKey' | 'oAuth2';
 
 export interface ResolvedAzureAuth {

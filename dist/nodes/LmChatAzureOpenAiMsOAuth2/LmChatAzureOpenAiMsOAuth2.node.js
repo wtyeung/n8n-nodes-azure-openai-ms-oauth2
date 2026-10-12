@@ -39,7 +39,7 @@ const azureOpenAiAuth_1 = require("../shared/azureOpenAiAuth");
 class LmChatAzureOpenAiMsOAuth2 {
     constructor() {
         this.description = {
-            displayName: 'Azure OpenAI Chat Model (MS OAuth2)',
+            displayName: `Azure OpenAI Chat Model (MS OAuth2) v${azureOpenAiAuth_1.packageVersion}`,
             name: 'lmChatAzureOpenAiMsOAuth2',
             icon: 'file:azure-openai.svg',
             group: ['transform'],
@@ -211,6 +211,13 @@ class LmChatAzureOpenAiMsOAuth2 {
                             description: 'Controls diversity via nucleus sampling: 0.5 means half of all likelihood-weighted options are considered. We generally recommend altering this or temperature but not both.',
                             type: 'number',
                         },
+                        {
+                            displayName: 'Use Responses API',
+                            name: 'useResponsesApi',
+                            default: false,
+                            description: 'Whether to call the OpenAI Responses API ("openai/responses") instead of Chat Completions ("openai/deployments/{name}/chat/completions"). Off by default to match the classic deployment-based URL that most Azure OpenAI resources and APIM gateways are configured for. Turn this on only for models that require the Responses API (e.g. some newer reasoning models) and whose endpoint/APIM gateway actually supports that route.',
+                            type: 'boolean',
+                        },
                     ],
                 },
             ],
@@ -250,8 +257,8 @@ class LmChatAzureOpenAiMsOAuth2 {
         };
     }
     async supplyData(itemIndex) {
-        var _a, _b;
-        this.logger.info('=== supplyData called for Azure OpenAI Chat Model (MS OAuth2) v1.5.3 ===');
+        var _a, _b, _c;
+        this.logger.info(`=== supplyData called for Azure OpenAI Chat Model (MS OAuth2) v${azureOpenAiAuth_1.packageVersion} ===`);
         const deploymentNameParam = this.getNodeParameter('deploymentName', itemIndex);
         const deploymentName = typeof deploymentNameParam === 'string'
             ? deploymentNameParam
@@ -280,7 +287,7 @@ class LmChatAzureOpenAiMsOAuth2 {
                 }
                 : undefined,
             streaming: false,
-            useResponsesApi: false,
+            useResponsesApi: (_c = options.useResponsesApi) !== null && _c !== void 0 ? _c : false,
             callbacks: [new N8nLlmTracing(this)],
         });
         return {

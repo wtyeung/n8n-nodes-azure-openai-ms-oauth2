@@ -10,12 +10,13 @@ import {
 import {
 	azureAuthenticationProperty,
 	azureCredentialsDescriptor,
+	packageVersion,
 	resolveAzureOpenAiAuth,
 } from '../shared/azureOpenAiAuth';
 
 export class LmEmbeddingAzureOpenAiMsOAuth2SubNode implements INodeType {
 	description: INodeTypeDescription = {
-		displayName: 'Embeddings Azure OpenAI (MS OAuth2)',
+		displayName: `Embeddings Azure OpenAI (MS OAuth2) v${packageVersion}`,
 		name: 'lmEmbeddingAzureOpenAiMsOAuth2SubNode',
 		icon: 'file:azure-openai.svg',
 		credentials: azureCredentialsDescriptor,
