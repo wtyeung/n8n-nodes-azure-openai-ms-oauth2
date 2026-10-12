@@ -29,6 +29,7 @@ export class LmChatAzureOpenAiMsOAuth2 implements INodeType {
 			categories: ['AI'],
 			subcategories: {
 				AI: ['Language Models', 'Root Nodes'],
+				'Language Models': ['Chat Models (Recommended)'],
 			},
 			resources: {
 				primaryDocumentation: [

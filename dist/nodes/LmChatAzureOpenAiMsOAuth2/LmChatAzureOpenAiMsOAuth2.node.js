@@ -53,6 +53,7 @@ class LmChatAzureOpenAiMsOAuth2 {
                 categories: ['AI'],
                 subcategories: {
                     AI: ['Language Models', 'Root Nodes'],
+                    'Language Models': ['Chat Models (Recommended)'],
                 },
                 resources: {
                     primaryDocumentation: [
