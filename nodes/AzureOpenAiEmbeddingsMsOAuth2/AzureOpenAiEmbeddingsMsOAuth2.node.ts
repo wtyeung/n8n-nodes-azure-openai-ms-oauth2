@@ -11,7 +11,7 @@ import {
 	resolveAzureOpenAiAuth,
 } from '../shared/azureOpenAiAuth';
 
-export class LmEmbeddingAzureOpenAiMsOAuth2 implements INodeType {
+export class AzureOpenAiEmbeddingsMsOAuth2 implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'Azure OpenAI Embeddings MS OAuth2',
 		name: 'azureOpenAiEmbeddingsMsOAuth2',

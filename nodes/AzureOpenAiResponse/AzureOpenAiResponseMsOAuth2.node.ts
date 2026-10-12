@@ -14,7 +14,7 @@ type ContentItem =
 	| { type: 'input_image'; image_url: string }
 	| { type: 'input_file'; filename: string; file_data: string };
 
-export class AzureOpenAiResponse implements INodeType {
+export class AzureOpenAiResponseMsOAuth2 implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'Azure OpenAI Response (MS OAuth2)',
 		name: 'azureOpenAiResponseMsOAuth2',
