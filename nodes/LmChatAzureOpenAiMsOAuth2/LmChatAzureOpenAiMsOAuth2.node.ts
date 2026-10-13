@@ -79,7 +79,7 @@ export class LmChatAzureOpenAiMsOAuth2 implements INodeType {
 					})()
 				},
 				required: true,
-				description: 'The deployment name configured in your Azure OpenAI resource. Mark default with * in AZURE_OPENAI_MODELS (e.g., "*gpt-4o,gpt-4,gpt-35-turbo").',
+				description: 'The deployment name configured in your Azure OpenAI resource. In AZURE_OPENAI_MODELS, prefix the default with * and suffix Responses API deployments with :responses (e.g. "gpt-4o,*gpt-5.6-luna:responses").',
 				modes: [
 					{
 						displayName: 'From List',
@@ -202,7 +202,7 @@ export class LmChatAzureOpenAiMsOAuth2 implements INodeType {
 						name: 'useResponsesApi',
 						default: false,
 						description:
-							'Whether to call the OpenAI Responses API ("openai/responses") instead of Chat Completions ("openai/deployments/{name}/chat/completions"). Off by default to match the classic deployment-based URL that most Azure OpenAI resources and APIM gateways are configured for. Turn this on only for models that require the Responses API (e.g. some newer reasoning models) and whose endpoint/APIM gateway actually supports that route.',
+							'Whether to call the OpenAI Responses API ("openai/responses") instead of Chat Completions. This is enabled automatically when the selected AZURE_OPENAI_MODELS entry ends with :responses; this option remains available as a manual override for existing configurations.',
 						type: 'boolean',
 					},
 				],
@@ -225,7 +225,7 @@ export class LmChatAzureOpenAiMsOAuth2 implements INodeType {
 				// Filter models if search term provided
 				const filteredModels = filter
 					? models.filter(m => {
-						const modelName = m.replace(/^\*/, ''); // Remove * for filtering
+						const modelName = m.replace(/^\*/, '').replace(/:responses$/, ''); // Remove metadata for filtering
 						return modelName.toLowerCase().includes(filter.toLowerCase());
 					})
 					: models;
@@ -242,10 +242,13 @@ export class LmChatAzureOpenAiMsOAuth2 implements INodeType {
 				return {
 					results: sortedModels.map(model => {
 						const isDefault = model.startsWith('*');
-						const modelName = model.replace(/^\*/, ''); // Remove * prefix
+						const value = model.replace(/^\*/, '');
+						const usesResponsesApi = value.endsWith(':responses');
+						const modelName = value.replace(/:responses$/, '');
+						const labels = [usesResponsesApi ? 'Responses API' : '', isDefault ? 'default' : ''].filter(Boolean);
 						return {
-							name: isDefault ? `${modelName} (default)` : modelName,
-							value: modelName,
+							name: labels.length > 0 ? `${modelName} (${labels.join(', ')})` : modelName,
+							value,
 						};
 					}),
 				};
@@ -258,9 +261,11 @@ export class LmChatAzureOpenAiMsOAuth2 implements INodeType {
 		
 		// Handle resourceLocator format
 		const deploymentNameParam = this.getNodeParameter('deploymentName', itemIndex) as { mode: string; value: string } | string;
-		const deploymentName = typeof deploymentNameParam === 'string' 
-			? deploymentNameParam 
+		const deploymentValue = typeof deploymentNameParam === 'string'
+			? deploymentNameParam
 			: deploymentNameParam.value;
+		const useResponsesApiFromModel = deploymentValue.endsWith(':responses');
+		const deploymentName = deploymentValue.replace(/:responses$/, '');
 		const options = this.getNodeParameter('options', itemIndex, {}) as {
 			maxTokens?: number;
 			temperature?: number;
@@ -279,19 +284,16 @@ export class LmChatAzureOpenAiMsOAuth2 implements INodeType {
 
 		// Dynamic imports prevent silent node unloading when @langchain packages
 		// are not resolvable at module load time on some workers in queue mode
-		const { AzureChatOpenAI } = await import('@langchain/openai');
+		const { AzureChatOpenAI, ChatOpenAI } = await import('@langchain/openai');
+		const { makeN8nLlmFailedAttemptHandler } = await import('@n8n/ai-utilities');
 		const { N8nLlmTracing } = await import('./N8nLlmTracing');
 
 		// Create model with fresh token
 		const timeout = options.timeout ?? 60000;
-		const model = new AzureChatOpenAI({
+		const commonOptions = {
 			// model name is required for correct internal logic (e.g. maxTokens vs maxCompletionTokens mapping)
 			// and for proper tool call response parsing in the agent loop
 			model: deploymentName,
-			azureOpenAIApiDeploymentName: deploymentName,
-			azureOpenAIApiKey: auth.token, // API key, or fresh JWT token passed as api-key for APIM to validate
-			azureOpenAIEndpoint: auth.endpoint,
-			azureOpenAIApiVersion: auth.apiVersion,
 			maxTokens: options.maxTokens !== -1 ? options.maxTokens : undefined,
 			temperature: options.temperature,
 			topP: options.topP,
@@ -299,24 +301,44 @@ export class LmChatAzureOpenAiMsOAuth2 implements INodeType {
 			presencePenalty: options.presencePenalty,
 			timeout,
 			maxRetries: options.maxRetries ?? 2,
-			modelKwargs: options.responseFormat
-				? {
-						response_format: { type: options.responseFormat },
-					}
-				: undefined,
 			streaming: false,
-			// Defaults to Chat Completions ("openai/deployments/{name}/chat/completions"),
-			// matching the classic deployment-based URL most Azure OpenAI resources and APIM
-			// gateways are configured for. Newer @langchain/openai versions auto-detect
-			// certain model families (e.g. GPT-5/reasoning models) and would otherwise
-			// silently switch to the Responses API ("openai/responses"), which uses a
-			// different URL shape and 404s against endpoints that don't support that route.
-			// Some newer reasoning-only models require the Responses API to work at all, so
-			// this is exposed as an option rather than hardcoded.
-			useResponsesApi: options.useResponsesApi ?? false,
 			callbacks: [new N8nLlmTracing(this)],
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		} as any);
+			onFailedAttempt: makeN8nLlmFailedAttemptHandler(this),
+		};
+		const useResponsesApi = useResponsesApiFromModel || (options.useResponsesApi ?? false);
+		this.logger.info('Initializing Azure OpenAI chat model', {
+			deploymentName,
+			api: useResponsesApi ? 'responses' : 'chat-completions',
+			endpoint: auth.endpoint,
+			apiVersion: auth.apiVersion,
+		});
+		const model = useResponsesApi
+			? new ChatOpenAI({
+					...commonOptions,
+					useResponsesApi: true,
+					modelKwargs: options.responseFormat
+						? { text: { format: { type: options.responseFormat } } }
+						: undefined,
+					configuration: {
+						baseURL: `${auth.endpoint.replace(/\/+$/, '')}/openai`,
+						apiKey: auth.token,
+						defaultHeaders: { 'api-key': auth.token },
+						defaultQuery: { 'api-version': auth.apiVersion },
+					},
+					// eslint-disable-next-line @typescript-eslint/no-explicit-any
+				} as any)
+			: new AzureChatOpenAI({
+					...commonOptions,
+					azureOpenAIApiDeploymentName: deploymentName,
+					azureOpenAIApiKey: auth.token, // API key, or fresh JWT token passed as api-key for APIM to validate
+					azureOpenAIEndpoint: auth.endpoint,
+					azureOpenAIApiVersion: auth.apiVersion,
+					modelKwargs: options.responseFormat
+						? { response_format: { type: options.responseFormat } }
+						: undefined,
+					useResponsesApi: false,
+					// eslint-disable-next-line @typescript-eslint/no-explicit-any
+				} as any);
 
 		return {
 			response: model,

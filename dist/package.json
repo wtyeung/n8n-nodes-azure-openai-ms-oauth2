@@ -1,6 +1,6 @@
 {
     "name": "n8n-nodes-azure-openai-ms-oauth2",
-    "version": "1.7.3",
+    "version": "1.7.4",
     "description": "Azure OpenAI Chat Model and Embeddings with MS OAuth2 for n8n",
     "license": "MIT",
     "homepage": "https://github.com/wtyeung/n8n-nodes-azure-openai-ms-oauth2",
@@ -47,6 +47,7 @@
         ]
     },
     "devDependencies": {
+        "@langchain/openai": "1.6.2",
         "@n8n/ai-utilities": "*",
         "@n8n/node-cli": "*",
         "@types/lodash": "^4.17.21",
@@ -57,9 +58,7 @@
         "typescript": "5.9.2"
     },
     "peerDependencies": {
-        "@langchain/openai": ">=0.3.0",
         "@n8n/ai-utilities": "*",
-        "langchain": ">=0.3.0",
         "n8n-workflow": "*"
     },
     "dependencies": {

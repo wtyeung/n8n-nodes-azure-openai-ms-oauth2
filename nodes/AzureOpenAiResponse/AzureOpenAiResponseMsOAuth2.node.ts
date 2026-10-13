@@ -42,7 +42,7 @@ export class AzureOpenAiResponseMsOAuth2 implements INodeType {
 						// eslint-disable-next-line @n8n/community-nodes/no-restricted-globals
 						const modelsEnv = process.env.AZURE_OPENAI_MODELS || '*gpt-4o,gpt-4,gpt-35-turbo';
 						const defaultModel = modelsEnv.split(',').map(m => m.trim()).find(m => m.startsWith('*'));
-						return defaultModel ? defaultModel.replace(/^\*/, '') : '';
+						return defaultModel ? defaultModel.replace(/^\*/, '').replace(/:responses$/, '') : '';
 					})(),
 				},
 				required: true,
@@ -318,7 +318,7 @@ export class AzureOpenAiResponseMsOAuth2 implements INodeType {
 				const modelsEnv = process.env.AZURE_OPENAI_MODELS || '*gpt-4o,gpt-4,gpt-35-turbo';
 				const models = modelsEnv.split(',').map(m => m.trim()).filter(m => m.length > 0);
 				const filteredModels = filter
-					? models.filter(m => m.replace(/^\*/, '').toLowerCase().includes(filter.toLowerCase()))
+					? models.filter(m => m.replace(/^\*/, '').replace(/:responses$/, '').toLowerCase().includes(filter.toLowerCase()))
 					: models;
 				const sortedModels = filteredModels.sort((a, b) => {
 					if (a.startsWith('*') && !b.startsWith('*')) return -1;
@@ -328,7 +328,7 @@ export class AzureOpenAiResponseMsOAuth2 implements INodeType {
 				return {
 					results: sortedModels.map(model => {
 						const isDefault = model.startsWith('*');
-						const modelName = model.replace(/^\*/, '');
+						const modelName = model.replace(/^\*/, '').replace(/:responses$/, '');
 						return {
 							name: isDefault ? `${modelName} (default)` : modelName,
 							value: modelName,
@@ -346,7 +346,7 @@ export class AzureOpenAiResponseMsOAuth2 implements INodeType {
 		for (let itemIndex = 0; itemIndex < items.length; itemIndex++) {
 			try {
 				const modelParam = this.getNodeParameter('model', itemIndex) as { mode: string; value: string } | string;
-				const model = typeof modelParam === 'string' ? modelParam : modelParam.value;
+				const model = (typeof modelParam === 'string' ? modelParam : modelParam.value).replace(/:responses$/, '');
 				const inputMode = this.getNodeParameter('inputMode', itemIndex, 'fields') as string;
 				const options = this.getNodeParameter('options', itemIndex, {}) as {
 					responseFormat?: string;

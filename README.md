@@ -17,7 +17,7 @@ Azure OpenAI Service provides REST API access to OpenAI's powerful language mode
 
 ## Installation
 
-**⚠️ Self-Hosted n8n Required**: This node requires a self-hosted n8n instance as it depends on `@langchain/openai` and `langchain` packages. n8n Cloud does not support community nodes with external dependencies.
+**⚠️ Self-Hosted n8n Required**: This community node is intended for self-hosted n8n installations.
 
 Follow the [installation guide](https://docs.n8n.io/integrations/community-nodes/installation/) in the n8n community nodes documentation.
 
@@ -37,6 +37,8 @@ Or install directly in n8n:
 ### LangChain Chat Model
 - **AI Agent Integration**: Use as a language model in AI Agent workflows
 - **LangChain Chains**: Compatible with all LangChain chain types
+- **Chat Completions and Responses APIs**: Route each deployment to the appropriate API
+- **Responses Deployment Metadata**: Add `:responses` to an `AZURE_OPENAI_MODELS` entry to select the Responses API without a trial request
 - **Streaming Support**: Real-time response streaming
 - **Execution Visibility**: Full n8n integration with animation and data display
 
@@ -133,7 +135,7 @@ To use this node, you need:
 - Minimum n8n version: 1.0.0
 - Tested with n8n version: 1.119.1+
 - Requires LangChain support in n8n
-- Requires `@langchain/openai` and `langchain` packages (installed as peer dependencies)
+- Developed and tested with `@langchain/openai` 1.6.2
 
 ## Usage
 
@@ -158,6 +160,7 @@ To use this node, you need:
    - **Temperature**: Controls randomness (0-2, default: 0.7)
    - **Timeout (Ms)**: Request timeout in milliseconds (default: 60000)
    - **Top P**: Nucleus sampling (0-1, default: 1)
+   - **Use Responses API**: Manual override for deployments not annotated with `:responses`
 
 ### Using with LangChain Chains
 
@@ -208,24 +211,34 @@ The chat model node supports dynamic model selection via environment variables, 
 Set the `AZURE_OPENAI_MODELS` environment variable before starting n8n:
 
 ```bash
-export AZURE_OPENAI_MODELS="gpt-4o-deployment,*gpt-4-deployment,gpt-35-turbo-deployment"
+export AZURE_OPENAI_MODELS="gpt-4o-deployment,*gpt-5.6-luna:responses,gpt-5-chat"
 n8n start
 ```
 
 **Format:**
 - Comma-separated list of deployment names
-- Prefix a model with `*` to mark it as the default
-- Example: `"model1,*model2,model3"` makes `model2` the default
+- Prefix a deployment with `*` to mark it as the default
+- Suffix a deployment with `:responses` to call `/openai/responses`; unannotated deployments use Chat Completions
+- Example: `"gpt-4o,*gpt-5.6-luna:responses,gpt-5-chat"` makes `gpt-5.6-luna` the default and routes it to the Responses API
+- The markers are metadata only and are removed before the deployment name is sent to Azure OpenAI
 
 **In the n8n UI:**
 - **From List** mode: Shows dropdown with configured models
-  - Default model appears first with "(default)" label
+  - Default and Responses API deployments are labeled in the list
   - Searchable/filterable list
-- **By ID** mode: Manual text entry for deployment names
+- **By ID** mode: Manual text entry for deployment names; append `:responses` to select the Responses API
 
 **Without environment variable:**
 - Defaults to: `*gpt-4o,gpt-4,gpt-35-turbo`
 - Users can always switch to "By ID" mode for manual entry
+
+A local `.env` file is not automatically loaded by every n8n startup method. Export the variable in the shell, configure it in the n8n service/container environment, or explicitly source the file before starting n8n.
+
+**Queue mode:**
+- The selected value, including `:responses`, is saved in the workflow and sent with queued execution jobs
+- Main and worker processes must all run the package version that understands the suffix
+- Restart all main and worker processes after updating the package
+- Changing only the model list requires restarting the editor/main process; workers can execute an already-saved annotated value without reading `AZURE_OPENAI_MODELS`
 
 ### Token Refresh Buffer
 
