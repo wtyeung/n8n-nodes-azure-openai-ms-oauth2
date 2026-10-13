@@ -103,7 +103,12 @@ export class AzureOpenAiEmbeddingsMsOAuth2 implements INodeType {
 				// For OAuth2 this also handles proactive token refresh.
 				const auth = await resolveAzureOpenAiAuth(this, itemIndex, deploymentName);
 
-				const url = `${auth.endpoint}openai/deployments/${deploymentName}/embeddings?api-version=${auth.apiVersion}`;
+				const url = `${auth.endpoint}/openai/deployments/${deploymentName}/embeddings?api-version=${auth.apiVersion}`;
+				this.logger.info('Calling Azure OpenAI Embeddings API', {
+					deploymentName,
+					endpoint: auth.endpoint,
+					apiVersion: auth.apiVersion,
+				});
 
 				const body: Record<string, unknown> = {
 					input: text,

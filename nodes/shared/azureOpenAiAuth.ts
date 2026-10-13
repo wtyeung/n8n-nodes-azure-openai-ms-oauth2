@@ -246,7 +246,7 @@ export async function resolveAzureOpenAiAuth(
 		}
 
 		return {
-			endpoint: (credentials.endpoint as string).replace(/\/$/, ''),
+			endpoint: (credentials.endpoint as string).replace(/\/+$/, ''),
 			apiVersion: credentials.apiVersion as string,
 			token: credentials.apiKey as string,
 			authentication,
@@ -262,7 +262,7 @@ export async function resolveAzureOpenAiAuth(
 	const token = await getCurrentOAuthToken(context, credentials, deploymentName);
 
 	return {
-		endpoint: (credentials.endpoint as string).replace(/\/$/, ''),
+		endpoint: (credentials.endpoint as string).replace(/\/+$/, ''),
 		apiVersion: credentials.apiVersion as string,
 		token,
 		authentication,
